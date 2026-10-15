@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.vercel/
+.env
+.env.*
+!.env.example
+*.log
+coverage/
+# local-only seed state (contains synthetic member keys for the demo circle; never commit)
+.seed/

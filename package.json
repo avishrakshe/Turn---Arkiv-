@@ -1,0 +1,41 @@
+{
+  "name": "turn-arkiv",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turn on Arkiv: a tamper-evident shared ledger for Indian savings committees (BC / kitty / chit).",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "probe": "tsx scripts/probe-network.ts",
+    "smoke": "tsx scripts/smoke-write.ts",
+    "seed": "tsx scripts/seed-demo.ts"
+  },
+  "dependencies": {
+    "@arkiv-network/sdk": "0.8.1",
+    "@category-labs/mera": "0.2.0",
+    "arkiv-encryption": "0.1.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "viem": "2.57.7"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.2.0",
+    "fake-indexeddb": "6.2.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vitest": "4.1.12"
+  }
+}
