@@ -9,7 +9,7 @@
  */
 import { formatEther, type Hex } from "viem"
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
-import { eventsClient, publicClient, walletClient } from "../src/arkiv/client"
+import { eventsClient, publicClient, serverOptions, walletClient } from "../src/arkiv/client"
 import { loadCircle } from "../src/arkiv/circle"
 import { CHAIN, explorerEntityUrl, explorerTxUrl } from "../src/arkiv/config"
 import { importCircleKey, newCircleKeyHex } from "../src/arkiv/payload"
@@ -20,12 +20,12 @@ import { roundDueMs } from "../src/core/schedule"
 import type { Address, CircleBody } from "../src/core/bodies"
 import { drip, parseDripConfig } from "../src/server/drip"
 
-const reader = publicClient()
+const reader = publicClient(serverOptions())
 const gasLog: { type: string; gasUsed: bigint }[] = []
 
 function writerFor(pk: Hex) {
   const account = privateKeyToAccount(pk)
-  return new ArkivWriter(walletClient(account), reader, account.address.toLowerCase() as Address)
+  return new ArkivWriter(walletClient(account, serverOptions()), reader, account.address.toLowerCase() as Address)
 }
 
 async function must(w: ArkivWriter, intent: Intent, key: CryptoKey | null): Promise<Extract<WriteOutcome, { status: "confirmed" }>> {
@@ -103,7 +103,7 @@ async function main() {
   const unwatch = ws.watchEntityEvents({ onExpiryExtended: (e) => { seen.push(e.entityKey.toLowerCase()) }, onError: (e) => console.log("  watch error:", e.message) })
   await new Promise((r) => setTimeout(r, 1_500))
   const m2 = members[1]!
-  const memberWallet = walletClient(privateKeyToAccount(m2.pk))
+  const memberWallet = walletClient(privateKeyToAccount(m2.pk), serverOptions())
   const ext = await runBatch(memberWallet, reader, { extend: { keys: toExtend.map((r) => r.key), toBlock: target } })
   console.log(`\nkeep-alive by member C: ${ext.status} ${"txHash" in ext && ext.txHash ? explorerTxUrl(ext.txHash) : ""} extended=${ext.status === "confirmed" ? ext.extended.length : 0}/${toExtend.length} → block ${target}`)
   if (ext.status === "confirmed") gasLog.push({ type: `batch_extend_x${ext.extended.length}`, gasUsed: (await reader.getTransactionReceipt({ hash: ext.txHash })).gasUsed })

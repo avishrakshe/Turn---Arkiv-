@@ -16,6 +16,8 @@ export type DripConfig = {
   /** Refuse if the recipient already holds at least this much GLM. */
   maxRecipientBalanceGlm: string
   rpcUrl?: string
+  /** Arkiv access key (X-API-KEY), optional. */
+  apiKey?: string
 }
 
 export type DripResult =
@@ -30,7 +32,8 @@ export function parseDripConfig(env: Record<string, string | undefined>): DripCo
     privateKey: key as `0x${string}`,
     amountGlm: env.DRIP_AMOUNT_GLM ?? "0.02",
     maxRecipientBalanceGlm: env.DRIP_MAX_RECIPIENT_BALANCE_GLM ?? "0.005",
-    rpcUrl: env.ARKIV_RPC_URL,
+    rpcUrl: env.ARKIV_RPC_URL || undefined,
+    apiKey: env.ARKIV_API_KEY || undefined,
   }
 }
 
@@ -45,7 +48,7 @@ export async function drip(config: DripConfig, recipient: string): Promise<DripR
   if (to === account.address) return { status: "refused", reason: "self" }
 
   const rpcUrl = config.rpcUrl ?? tiramisu.rpcUrls.default.http[0]
-  const transport = http(rpcUrl, { retryCount: 0, timeout: 15_000, fetchOptions: { cache: "no-store", redirect: "error" } })
+  const transport = http(rpcUrl, { retryCount: 0, timeout: 15_000, fetchOptions: { cache: "no-store", redirect: "error", ...(config.apiKey && { headers: { "X-API-KEY": config.apiKey } }) } })
   const reader = createPublicClient({ chain: tiramisu, cacheTime: 0, transport })
   if (await reader.getChainId() !== tiramisu.id) throw new Error("Wrong chain")
 

@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from "react"
 import { Button, Card, Field, inputCls, Loading, Pill, Shell, short } from "@/components/ui"
-import { publicClient } from "@/src/arkiv/client"
+import { isRateLimited, publicClient } from "@/src/arkiv/client"
 import { EXPLORER, RPC_HTTP } from "@/src/arkiv/config"
 import { importCircleKey } from "@/src/arkiv/payload"
 import { loadCircle } from "@/src/arkiv/circle"
@@ -24,9 +24,10 @@ export default function Verify() {
   const [ledger, setLedger] = useState<PublicLedger | null | undefined>(undefined)
   const [names, setNames] = useState<Map<string, string>>(new Map())
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function run(id: string, org: string, k: string | null) {
-    setBusy(true); setLedger(undefined); setNames(new Map())
+    setBusy(true); setLedger(undefined); setNames(new Map()); setError(null)
     try {
       const client = publicClient()
       const hint = /^0x[0-9a-f]{40}$/.test(org) ? (org as Address) : undefined
@@ -37,7 +38,11 @@ export default function Verify() {
         const v = buildView(snap)
         if (v) setNames(new Map(v.members.map((m) => [m.address, m.name])))
       }
-    } catch { setLedger(null) } finally { setBusy(false) }
+    } catch (e) {
+      setError(isRateLimited(e)
+        ? "The public Tiramisu RPC refused this read: its free anonymous budget for your connection is used up (HTTP 429). Wait a few minutes and try again — this page deliberately has no Turn server to fall back on."
+        : "Couldn't reach the Tiramisu RPC. Check your connection and try again.")
+    } finally { setBusy(false) }
   }
 
   useEffect(() => {
@@ -66,7 +71,8 @@ export default function Verify() {
       </Card>
 
       {busy && <Loading text={t("loading")} />}
-      {ledger === null && !busy && <Card><p>No committee with this id on Tiramisu.</p></Card>}
+      {error && <Card><p className="text-sm">{error}</p></Card>}
+      {ledger === null && !busy && !error && <Card><p>No committee with this id on Tiramisu.</p></Card>}
       {ledger && (
         <>
           <Card className="flex flex-col gap-1 text-sm">

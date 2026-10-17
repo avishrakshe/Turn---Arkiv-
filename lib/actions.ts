@@ -17,13 +17,15 @@ import { buildView, fixedPayout, type CircleView, type RoundView } from "@/src/c
 import type { Payment } from "@/src/core/payments"
 import { saveCircle, type SavedCircle } from "./circles"
 
-export const reader = publicClient()
+/** Public RPC first; on refusal (e.g. the anonymous budget's 429) Turn's keyed proxy. */
+const VIA = { fallbackUrl: "/api/rpc" }
+export const reader = publicClient(VIA)
 
 const writers = new Map<string, ArkivWriter>()
 function writerFor(account: PrivateKeyAccount) {
   const a = account.address.toLowerCase()
   let w = writers.get(a)
-  if (!w) { w = new ArkivWriter(walletClient(account), reader, a as Address); writers.set(a, w) }
+  if (!w) { w = new ArkivWriter(walletClient(account, VIA), reader, a as Address); writers.set(a, w) }
   return w
 }
 
@@ -137,7 +139,7 @@ export async function closeRound(account: PrivateKeyAccount, c: SavedCircle, vie
     type: "round_result", circleId: c.circleId, round: r.round, isFinal: r.round === n, expires: resultExpiry,
     body: { winner: r.collector, discount_bps: 0, payout_inr: fixedPayout(view.rules, n), share_inr: 0, close_key: null, reveal_keys: [] },
   }, account.address.toLowerCase() as Address, key, newOpId())
-  const out = await runBatch(walletClient(account), reader, { creates: [create], extend: { keys: toExtend.map((x) => x.key), toBlock: target } })
+  const out = await runBatch(walletClient(account, VIA), reader, { creates: [create], extend: { keys: toExtend.map((x) => x.key), toBlock: target } })
   if (out.status !== "confirmed") throw new WriteFailed(out)
   return { txHash: out.txHash, created: out.created, extended: out.extended.length, target }
 }
@@ -148,7 +150,7 @@ export async function keepAlive(account: PrivateKeyAccount, view: CircleView) {
   const head = await reader.getBlockNumber({ cacheTime: 0 })
   const target = keepAliveTargetBlock(head, view.maxExpiresAt)
   const toExtend = extensionsTo(view.leaseRecords, target)
-  const out = await runBatch(walletClient(account), reader, { extend: { keys: toExtend.map((x) => x.key), toBlock: target } })
+  const out = await runBatch(walletClient(account, VIA), reader, { extend: { keys: toExtend.map((x) => x.key), toBlock: target } })
   if (out.status !== "confirmed") throw new WriteFailed(out)
   return { txHash: out.txHash, extended: out.extended.length, target }
 }
@@ -156,6 +158,6 @@ export async function keepAlive(account: PrivateKeyAccount, view: CircleView) {
 /** Organiser handover: the circle entity gets a new owner; its creator never changes. */
 export async function handOver(account: PrivateKeyAccount, view: CircleView, to: Address) {
   await ensureGas(account.address)
-  const r = await walletClient(account).changeOwnership({ entityKey: view.circleKey, newOwner: to })
+  const r = await walletClient(account, VIA).changeOwnership({ entityKey: view.circleKey, newOwner: to })
   return { txHash: r.txHash }
 }

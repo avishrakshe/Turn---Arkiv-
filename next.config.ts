@@ -3,6 +3,10 @@ import type { NextConfig } from "next"
 const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Local multi-phone testing: localhost, 127.0.0.1 and [::1] are separate origins (separate accounts).
+  allowedDevOrigins: ["127.0.0.1", "[::1]", "::1"],
+  // Don't write AGENTS.md / CLAUDE.md into the repo on `next dev`.
+  agentRules: false,
   async headers() {
     return [{
       source: "/:path*",

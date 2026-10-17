@@ -11,6 +11,7 @@ import { ackPayment, closeRound, keepAlive, lockRoster, payClaim, reader, snapsh
 import { getCircle, type SavedCircle } from "@/lib/circles"
 import { useT, type MsgKey } from "@/lib/i18n"
 import { useLiveCircle } from "@/lib/live"
+import { isRateLimited } from "@/src/arkiv/client"
 import { EXPLORER } from "@/src/arkiv/config"
 import type { AnyRec } from "@/src/arkiv/records"
 import { overdueQueryText, whoHasntPaid, type Late } from "@/src/arkiv/queries"
@@ -28,6 +29,7 @@ export default function CirclePage() {
   const [saved, setSaved] = useState<SavedCircle | null | undefined>(undefined)
   const [data, setData] = useState<Loaded | null>(null)
   const [live, setLive] = useState(false)
+  const [loadError, setLoadError] = useState<"limit" | "other" | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [dispute, setDispute] = useState<{ round: number; refKey: Hex; label: string } | null>(null)
   const prev = useRef<Loaded | null>(null)
@@ -59,7 +61,7 @@ export default function CirclePage() {
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("id") ?? ""
-    getCircle(id).then((c) => { setSaved(c ?? null); if (c) load(c, false).catch(() => undefined) })
+    getCircle(id).then((c) => { setSaved(c ?? null); if (c) load(c, false).then(() => setLoadError(null), (e) => setLoadError(isRateLimited(e) ? "limit" : "other")) })
   }, [load])
 
   const watch = useMemo(() => {
@@ -67,12 +69,22 @@ export default function CirclePage() {
     const creators = new Set<string>([data.view.organiser, ...data.view.members.map((m) => m.address)])
     return {
       creators, keys: new Set(data.records.map((r) => r.key)), anyCreator: data.view.phase === "joining",
-      onChange: () => { load(saved, true).catch(() => undefined) }, onHealth: setLive,
+      onChange: () => { load(saved, true).catch((e) => toast(isRateLimited(e) ? t("readLimit") : t("readFailed"), "warn")) }, onHealth: setLive,
     }
-  }, [saved, data, load])
+  }, [saved, data, load, t, toast])
   useLiveCircle(watch)
 
   if (saved === null) return <Shell back="/"><Card><p>{t("inviteBad")}</p></Card></Shell>
+  if (saved && !data && loadError) {
+    return (
+      <Shell back="/">
+        <Card className="flex flex-col gap-3">
+          <p>{t(loadError === "limit" ? "readLimit" : "readFailed")}</p>
+          <Button tone="quiet" onClick={() => { setLoadError(null); load(saved, false).catch((e) => setLoadError(isRateLimited(e) ? "limit" : "other")) }}>{t("retry")}</Button>
+        </Card>
+      </Shell>
+    )
+  }
   if (!saved || !data) return <Shell back="/"><Loading text={t("loading")} /></Shell>
 
   const { view, head } = data

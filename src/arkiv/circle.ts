@@ -58,33 +58,47 @@ export async function loadCircle(client: Reader, ref: CircleRef, key: CryptoKey)
   const orgRecs = await decodeAll(orgRaw.entities, (_t, c) => c === organiser)
   const circle = dedupeByOp(orgRecs.filter(isType("circle")))[0]
 
-  // 2. Joins from anyone (validated). Needed to verify the roster and, before it, to list joiners.
-  const joinRaw = await fetchAll(client, [...base, eq("entity_type", str("member"))], { atBlock: block })
-  const joinRecs = await decodeAll(joinRaw.entities.filter((e) => e.creator.toLowerCase() !== organiser), (t) => t === "member")
-  const allJoins = dedupeByOp([...orgRecs.filter(isType("member")), ...joinRecs.filter(isType("member"))])
-  // One join per address: the earliest.
-  const firstJoin = new Map<Address, Rec<"member">>()
-  for (const j of allJoins) if (!firstJoin.has(j.creator)) firstJoin.set(j.creator, j)
-
-  const roster = pickRoster(orgRecs.filter(isType("roster")), firstJoin, organiser, circle, rejected)
+  const firstJoinOf = (recs: AnyRec[]) => {
+    // One join per address: the earliest.
+    const m = new Map<Address, Rec<"member">>()
+    for (const j of dedupeByOp(recs.filter(isType("member")))) if (!m.has(j.creator)) m.set(j.creator, j)
+    return m
+  }
 
   let records: AnyRec[]
   let ignored: Snapshot["ignored"] = []
-  if (roster) {
-    const others = roster.body.members.filter((m) => m !== organiser)
-    const memberRaw = await fetchAll(client, base, { creators: others, atBlock: block })
-    const rosterSet = new Set(roster.body.members)
-    const memberRecs = await decodeAll(memberRaw.entities, (t, c) => rosterSet.has(c) && !ORGANISER_TYPES.includes(t))
-    records = dedupeByOp([...orgRecs, ...memberRecs])
-    // What the creator scope leaves out (keys + creators only; nothing is decrypted).
-    const all = await fetchAll(client, base, { atBlock: block, light: true })
-    const trustedSet = new Set<string>([organiser, ...roster.body.members])
-    ignored = all.entities.filter((e) => !trustedSet.has(e.creator.toLowerCase()))
-      .map((e) => ({ key: e.key.toLowerCase() as Hex, creator: e.creator.toLowerCase() as Address }))
-  } else {
-    records = dedupeByOp([...orgRecs, ...joinRecs])
+  let roster: Rec<"roster"> | undefined
+  let firstJoin = new Map<Address, Rec<"member">>()
+
+  // 2a. A roster exists: read ONLY the wallets it names (creator-scoped query) and check the roster
+  //     against their own joins. Nobody else's records are fetched, let alone decrypted.
+  const candidates = orgRecs.filter(isType("roster"))
+  if (candidates.length > 0) {
+    const named = [...new Set(candidates.flatMap((r) => r.body.members))].filter((m) => m !== organiser)
+    const memberRaw = await fetchAll(client, base, { creators: named, atBlock: block })
+    const namedSet = new Set(named)
+    const memberRecs = await decodeAll(memberRaw.entities, (t, c) => namedSet.has(c) && !ORGANISER_TYPES.includes(t))
+    firstJoin = firstJoinOf([...orgRecs, ...memberRecs])
+    roster = pickRoster(candidates, firstJoin, organiser, circle, rejected)
+    if (roster) {
+      const rosterSet = new Set(roster.body.members)
+      records = dedupeByOp([...orgRecs, ...memberRecs.filter((r) => rosterSet.has(r.creator))])
+      // What the creator scope leaves out (keys + creators only; nothing is decrypted).
+      const all = await fetchAll(client, base, { atBlock: block, light: true })
+      ignored = all.entities.filter((e) => !rosterSet.has(e.creator.toLowerCase() as Address) && e.creator.toLowerCase() !== organiser)
+        .map((e) => ({ key: e.key.toLowerCase() as Hex, creator: e.creator.toLowerCase() as Address }))
+    }
   }
 
+  // 2b. No valid roster yet: joins can come from any address (validated by decryption + binding);
+  //     the organiser chooses who gets in.
+  if (!roster) {
+    const joinRaw = await fetchAll(client, [...base, eq("entity_type", str("member"))], { atBlock: block })
+    const joinRecs = await decodeAll(joinRaw.entities.filter((e) => e.creator.toLowerCase() !== organiser), (t) => t === "member")
+    firstJoin = firstJoinOf([...orgRecs, ...joinRecs])
+    records = dedupeByOp([...orgRecs, ...joinRecs])
+  }
+  records = records!
   // due_at is public and queryable, so it must match the rules everyone agreed to.
   if (circle) {
     records = records.filter((r) => {

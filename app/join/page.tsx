@@ -6,6 +6,7 @@ import { useApp } from "@/components/providers"
 import { joinCircle, snapshot, WriteFailed } from "@/lib/actions"
 import { parseInvite, saveCircle, type SavedCircle } from "@/lib/circles"
 import { useT, type MsgKey } from "@/lib/i18n"
+import { isRateLimited } from "@/src/arkiv/client"
 import { inr } from "@/src/core/money"
 import { blockToDate } from "@/src/core/lease"
 import type { CircleView } from "@/src/core/view"
@@ -20,12 +21,13 @@ export default function JoinPage() {
   const [name, setName] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [readError, setReadError] = useState<"readLimit" | "readFailed" | null>(null)
 
   useEffect(() => {
     const r = parseInvite(window.location.hash)
     setRef(r)
     if (!r) return
-    snapshot(r).then(({ view, head }) => { setView(view ?? null); setHead(head) }).catch(() => setView(null))
+    snapshot(r).then(({ view, head }) => { setView(view ?? null); setHead(head) }).catch((e) => setReadError(isRateLimited(e) ? "readLimit" : "readFailed"))
   }, [])
 
   useEffect(() => {
@@ -35,6 +37,7 @@ export default function JoinPage() {
   }, [ref, view, account, router])
 
   if (ref === null) return <Shell><Card><p>{t("inviteBad")}</p></Card></Shell>
+  if (readError) return <Shell><Card><p>{t(readError)}</p></Card></Shell>
   if (ref === undefined || view === undefined) return <Shell><Loading text={t("loading")} /></Shell>
   if (view === null) return <Shell><Card><p>{t("inviteBad")}</p></Card></Shell>
 

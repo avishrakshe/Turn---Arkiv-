@@ -115,6 +115,9 @@ const en = {
   loading: "Reading the shared record…",
   mismatch: "⚠ The result doesn't match the turn order",
   managedBy: "Created by {creator} · Managed by {owner}",
+  readLimit: "Arkiv's free reading limit for this connection is used up for now. Try again in a few minutes.",
+  readFailed: "Couldn't read the shared record. Check your connection and try again.",
+  retry: "Try again",
 }
 
 type Dict = typeof en
@@ -227,6 +230,9 @@ const hi: Dict = {
   loading: "साझा हिसाब पढ़ रहे हैं…",
   mismatch: "⚠ नतीजा बारी के क्रम से मेल नहीं खाता",
   managedBy: "{creator} ने बनाई · {owner} सँभालते हैं",
+  readLimit: "इस कनेक्शन की Arkiv मुफ़्त पढ़ने की सीमा अभी पूरी हो गई। कुछ मिनट बाद फिर कोशिश करें।",
+  readFailed: "साझा हिसाब नहीं पढ़ पाए। कनेक्शन जाँचें और फिर कोशिश करें।",
+  retry: "फिर कोशिश करें",
 }
 
 export type MsgKey = keyof Dict

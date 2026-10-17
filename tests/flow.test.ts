@@ -74,7 +74,7 @@ describe("/verify: keyless public ledger", () => {
     const { s, meera, ravi, priya, arjun } = await sharma()
     const outsider = newAddress()
     await s.write(outsider, "pay_ack", { ref: ("0x" + "22".repeat(32)) as Hex, status: "received" }, { round: 2, refKey: ("0x" + "22".repeat(32)) as Hex, onTime: true })
-    const l = (await readPublicLedger(s.chain.reader, s.circleId))!
+    const l = (await readPublicLedger(s.chain as unknown as Parameters<typeof readPublicLedger>[0], s.circleId))!
     expect(l.organiser).toBe(meera)
     expect(l.roster?.members).toEqual(s.people)
     expect(l.rounds[0]!.payments.every((p) => p.state === "confirmed")).toBe(true)
@@ -90,7 +90,7 @@ describe("/verify: keyless public ledger", () => {
   it("a copycat circle with the same id from another wallet doesn't take over", async () => {
     const { s, meera } = await sharma()
     await s.write(newAddress(), "circle", s.rules.body)
-    const l = (await readPublicLedger(s.chain.reader, s.circleId))!
+    const l = (await readPublicLedger(s.chain as unknown as Parameters<typeof readPublicLedger>[0], s.circleId))!
     expect(l.organiser).toBe(meera) // earliest circle entity wins; a later copy is just ignored
   })
 })
