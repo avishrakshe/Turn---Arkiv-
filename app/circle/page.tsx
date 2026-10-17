@@ -5,6 +5,7 @@ import { Button, Card, formatDate, Loading, Pill, Shell, Stamp, short } from "@/
 import { useApp } from "@/components/providers"
 import { ShareInvite } from "@/components/share"
 import { DisputeSheet } from "@/components/dispute"
+import { Seal } from "@/components/seal"
 import { ProgressRing } from "@/components/ring/ProgressRing"
 import { TurnRing } from "@/components/ring/TurnRing"
 import { ackPayment, closeRound, keepAlive, lockRoster, payClaim, reader, snapshot, WriteFailed } from "@/lib/actions"
@@ -79,10 +80,10 @@ export default function CirclePage() {
   }, [saved, data, load, t, toast])
   useLiveCircle(watch)
 
-  if (saved === null) return <Shell back="/"><Card><p>{t("inviteBad")}</p></Card></Shell>
+  if (saved === null) return <Shell back="/app"><Card><p>{t("inviteBad")}</p></Card></Shell>
   if (saved && !data && loadError) {
     return (
-      <Shell back="/">
+      <Shell back="/app">
         <Card className="flex flex-col gap-3">
           <p>{t(loadError === "limit" ? "readLimit" : "readFailed")}</p>
           <Button tone="quiet" onClick={() => { setLoadError(null); load(saved, false).catch((e) => setLoadError(isRateLimited(e) ? "limit" : "other")) }}>{t("retry")}</Button>
@@ -90,7 +91,7 @@ export default function CirclePage() {
       </Shell>
     )
   }
-  if (!saved || !data) return <Shell back="/"><Loading text={t("loading")} /></Shell>
+  if (!saved || !data) return <Shell back="/app"><Loading text={t("loading")} /></Shell>
 
   const { view, head } = data
   const amISeated = !!me && view.members.some((m) => m.address === me)
@@ -98,6 +99,8 @@ export default function CirclePage() {
   const date = (b: bigint) => formatDate(blockToDate(b, head, data.at), lang)
 
   async function run(id: string, fn: () => Promise<unknown>, okText?: string) {
+    // Every write is logged with what triggered it (diagnosis of any unexpected write).
+    console.info("[turn] write", id, new Date().toISOString())
     setBusy(id)
     try {
       await fn()
@@ -115,7 +118,7 @@ export default function CirclePage() {
   })
 
   return (
-    <Shell back="/">
+    <Shell back="/app">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-[1.8rem]">{view.rules.name}</h1>
@@ -256,33 +259,21 @@ function RoundCard({ r, view, me, isOrganiser, busy, onPay, onAck, onClose, onDi
         </div>
       )}
 
-      <ul className="flex flex-col divide-y divide-line">
-        {r.payments.map((p) => {
-          const payer = nameOf(view, p.payer)
-          return (
-            <li key={p.payer} className="flex flex-col gap-1 py-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-medium">{p.payer === me ? t("you") : payer}</span>
-                <Pill tone={p.state === "confirmed" ? "ok" : p.state === "claimed" ? "wait" : p.state === "disputed" ? "bad" : "none"}>
-                  {p.state === "confirmed" ? t("confirmed", { name: collectorName }) : p.state === "claimed" ? t("claimed", { name: collectorName }) : p.state === "disputed" ? t("disputed") : t("notPaid")}
-                </Pill>
-              </div>
-              {p.claim && <Stamp name={payer} address={p.claim.creator} entityKey={p.claim.key} />}
-              {p.ack && <Stamp name={collectorName} address={p.ack.creator} entityKey={p.ack.key} />}
-              {p.disputes.map((d) => <DisputeLine key={d.key} d={d} view={view} />)}
-              <div className="flex gap-3">
-                {r.collector === me && p.state === "claimed" && (
-                  <Button tone="teal" className="min-h-10 flex-1" busy={busy === `ack-${p.payer}`} onClick={() => onAck(p)}>{t("markReceived")}</Button>
-                )}
-                {me && view.members.some((m) => m.address === me) && p.claim && (
-                  <button className="text-xs text-danger underline underline-offset-2" onClick={() => onDispute({ round: r.round, refKey: (p.ack ?? p.claim)!.key, label: `${payer} · ${t("round", { n: r.round })}` })}>{t("dispute")}</button>
-                )}
-              </div>
-            </li>
-          )
-        })}
+      {/* The seal strip: one Two-half Seal per payer, readable at a glance. */}
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2" aria-label={t("round", { n: r.round })}>
+        {r.payments.map((p) => (
+          <li key={p.payer} className="flex min-w-0 flex-col items-center gap-1 text-center">
+            <Seal state={p.state} size={52} label={`${nameOf(view, p.payer)}: ${p.state}`} />
+            <span className="w-full truncate text-xs font-medium">{p.payer === me ? t("you") : nameOf(view, p.payer)}</span>
+          </li>
+        ))}
       </ul>
-      {isOrganiser && (
+
+      <ul className="flex flex-col divide-y divide-line">
+        {r.payments.map((p) => (
+          <PaymentRow key={p.payer} p={p} r={r} view={view} me={me} busy={busy} onAck={onAck} onDispute={onDispute} />
+        ))}
+      </ul>      {isOrganiser && (
         <div className="flex flex-col gap-1">
           <Button tone={allConfirmed ? "primary" : "quiet"} busy={busy === "close"} onClick={onClose}>
             {t("closeRound", { n: r.round, name: collectorName, amount: inr(fixedPayout(view.rules, view.members.length)) })}
@@ -309,6 +300,7 @@ function WhoHasntPaid({ view }: { view: CircleView }) {
   const [res, setRes] = useState<{ late: Late[]; pages: number; claims: number; query: string } | null>(null)
   const order = useMemo(() => view.rounds.map((r) => r.collector), [view.rounds])
   const closed = useMemo(() => new Set(view.rounds.filter((r) => r.status === "closed").map((r) => r.round)), [view.rounds])
+  const claims = view.rounds.reduce((n, r) => n + r.payments.filter((p) => p.claim).length, 0)
   useEffect(() => {
     let off = false
     const now = Date.now()
@@ -317,9 +309,9 @@ function WhoHasntPaid({ view }: { view: CircleView }) {
       if (!off) setRes({ ...r, query: due.length ? overdueQueryText(view.circleId, now, [due[0]!, due.at(-1)!]) : "" })
     }).catch(() => undefined)
     return () => { off = true }
-    // Re-query only when the committee or the set of closed rounds changes (each query costs budget).
+    // Re-query only when the committee, the closed rounds or the number of claims changes (each query costs budget).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view.circleId, closed.size, order.length])
+  }, [view.circleId, closed.size, order.length, claims])
   if (!res) return null
   return (
     <Card className="flex flex-col gap-2">
@@ -336,5 +328,73 @@ function WhoHasntPaid({ view }: { view: CircleView }) {
       )}
       {res.query && <details className="text-xs text-ink-muted"><summary>Arkiv query</summary><code className="block break-all pt-1">{res.query}</code></details>}
     </Card>
+  )
+}
+
+/**
+ * One payer's line: seal + status, signatures (collapsed), and actions. "Received" is a two-step
+ * confirmation that names the person and amount and disarms after 8 s or when the data changes,
+ * so a stray or stale tap can never confirm money.
+ */
+function PaymentRow({ p, r, view, me, busy, onAck, onDispute }: {
+  p: Payment; r: RoundView; view: CircleView; me?: Address; busy: string | null
+  onAck: (p: Payment) => void; onDispute: (d: { round: number; refKey: Hex; label: string }) => void
+}) {
+  const { t } = useT()
+  const [armed, setArmed] = useState(false)
+  const payer = nameOf(view, p.payer)
+  const collectorName = nameOf(view, r.collector)
+  const claimKey = p.claim?.key
+  useEffect(() => { setArmed(false) }, [claimKey, p.state])
+  useEffect(() => {
+    if (!armed) return
+    const id = setTimeout(() => setArmed(false), 8_000)
+    return () => clearTimeout(id)
+  }, [armed])
+  const canAck = r.collector === me && p.state === "claimed" && !!p.claim
+  const canDispute = !!me && view.members.some((m) => m.address === me) && !!p.claim
+  return (
+    <li className="flex flex-col gap-2 py-3">
+      <div className="flex items-center gap-3">
+        <Seal state={p.state} size={36} label={p.state} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">{p.payer === me ? t("you") : payer}</p>
+          <p className={`text-xs ${p.state === "confirmed" ? "text-success" : p.state === "claimed" ? "text-warning" : p.state === "disputed" ? "text-danger" : "text-ink-muted"}`}>
+            {p.state === "confirmed" ? t("confirmed", { name: collectorName }) : p.state === "claimed" ? t("claimed", { name: collectorName }) : p.state === "disputed" ? t("disputed") : t("notPaid")}
+          </p>
+        </div>
+      </div>
+      {(p.claim || p.ack) && (
+        <details className="ps-12 text-xs text-ink-muted">
+          <summary className="cursor-pointer select-none">{t("signatures")}</summary>
+          <div className="mt-1 flex flex-col gap-0.5">
+            {p.claim && <Stamp name={payer} address={p.claim.creator} entityKey={p.claim.key} />}
+            {p.ack && <Stamp name={collectorName} address={p.ack.creator} entityKey={p.ack.key} />}
+          </div>
+        </details>
+      )}
+      {p.disputes.length > 0 && <div className="flex flex-col gap-1 ps-12">{p.disputes.map((d) => <DisputeLine key={d.key} d={d} view={view} />)}</div>}
+      {(canAck || canDispute) && (
+        <div className="flex flex-wrap items-center gap-2 ps-12">
+          {canAck && !armed && (
+            <Button tone="teal" className="min-h-10 px-4" onClick={() => setArmed(true)}>{t("markReceived")}</Button>
+          )}
+          {canAck && armed && (
+            <div className="flex w-full flex-col gap-2 rounded-xl border border-teal/40 bg-teal-soft p-3" role="group">
+              <p className="text-sm">{t("ackQuestion", { amount: inr(p.claim!.body.amount_inr), name: payer })}</p>
+              <div className="flex gap-2">
+                <Button tone="teal" className="min-h-10 flex-1" busy={busy === `ack-${p.payer}`}
+                  onClick={(e) => { if (!e.isTrusted) return; setArmed(false); onAck(p) }}>{t("ackYes")}</Button>
+                <Button tone="quiet" className="min-h-10" onClick={() => setArmed(false)}>{t("ackNo")}</Button>
+              </div>
+            </div>
+          )}
+          {canDispute && !armed && (
+            <button className="min-h-10 px-1 text-xs text-danger underline underline-offset-2"
+              onClick={() => onDispute({ round: r.round, refKey: (p.ack ?? p.claim)!.key, label: `${payer} · ${t("round", { n: r.round })}` })}>{t("dispute")}</button>
+          )}
+        </div>
+      )}
+    </li>
   )
 }

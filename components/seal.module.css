@@ -1,0 +1,57 @@
+.seal { display: block; overflow: visible; }
+
+.ring {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 2;
+  stroke-dasharray: 3 5;
+  transition: stroke var(--duration-slow) var(--ease-out), stroke-dasharray var(--duration-slow) var(--ease-out);
+}
+.locked .ring { stroke: var(--teal); stroke-dasharray: 200 0; stroke-width: 2.5; }
+.cracked .ring { stroke: var(--danger); }
+
+.half {
+  fill: var(--paper-sunk);
+  stroke: var(--line-strong);
+  stroke-width: 1.5;
+  transition: fill var(--duration-slow) var(--ease-out), transform var(--duration-slow) var(--ease-spring);
+  transform-box: fill-box;
+}
+/* The halves sit slightly apart until both are signed, then snap together. */
+.left { transform: translateX(-2px); }
+.right { transform: translateX(2px); }
+.payerOn { fill: var(--marigold); stroke: var(--marigold-ink); }
+.collectorOn { fill: var(--teal); stroke: var(--teal-hover); }
+.locked .left, .locked .right { transform: translateX(0); }
+
+.seam { stroke: var(--paper); stroke-width: 2; opacity: 1; transition: opacity var(--duration-slow); }
+.locked .seam { opacity: 0.25; }
+
+.check {
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  transition: stroke-dashoffset 420ms var(--ease-out) 120ms;
+}
+.locked .check { stroke-dashoffset: 0; }
+
+.crack {
+  fill: none;
+  stroke: var(--danger);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-dasharray: 70;
+  stroke-dashoffset: 70;
+  transition: stroke-dashoffset 380ms var(--ease-out);
+}
+.cracked .crack { stroke-dashoffset: 0; }
+
+.selfText { fill: var(--ink-faint); font: 600 18px var(--font-sans); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ring, .half, .seam, .check, .crack { transition: none; }
+}

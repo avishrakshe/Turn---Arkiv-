@@ -49,7 +49,7 @@ export default function CreatePage() {
 
   if (done) {
     return (
-      <Shell back="/">
+      <Shell back="/app">
         <h1 className="text-[1.8rem]">{t("share")}</h1>
         <p className="text-sm text-success">✓ {t("saved")}</p>
         <ShareInvite circle={done} name={name} amount={amount} members={members} />
@@ -60,7 +60,7 @@ export default function CreatePage() {
 
   const valid = name.trim().length > 0 && me.trim().length > 0 && amount >= 100 && members >= 3 && members <= 20
   return (
-    <Shell back="/">
+    <Shell back="/app">
       <h1 className="text-[1.8rem]">{t("create")}</h1>
       <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t("template")}>
         {TEMPLATES.map((x) => (

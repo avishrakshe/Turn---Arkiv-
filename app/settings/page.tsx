@@ -21,7 +21,7 @@ export default function Settings() {
   useEffect(() => { accountInfo().then(setInfo) }, [account])
 
   return (
-    <Shell back="/">
+    <Shell back="/app">
       <h1 className="text-[1.8rem]">{t("settings")}</h1>
       <Card className="flex flex-col gap-2">
         <p className="font-semibold">{t("language")}</p>
@@ -52,7 +52,7 @@ export default function Settings() {
         <input type="file" accept="application/json" className="text-sm" onChange={async (e) => {
           const f = e.target.files?.[0]
           if (!f) return
-          try { const a = await importBackup(await f.text()); setMsg(`✓ ${short(a)}`); location.href = "/" } catch { setMsg(t("error")) }
+          try { const a = await importBackup(await f.text()); setMsg(`✓ ${short(a)}`); location.href = "/app" } catch { setMsg(t("error")) }
         }} />
         {msg && <p className="text-sm">{msg}</p>}
       </Card>

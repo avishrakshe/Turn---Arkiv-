@@ -62,7 +62,7 @@ export default function Verify() {
 
   const who = (a: string) => names.get(a) ?? short(a)
   return (
-    <Shell back="/">
+    <Shell back="/app">
       <h1 className="text-[1.8rem]">Read the ledger without Turn</h1>
       <p className="text-sm text-ink-muted">
         This page asks Arkiv directly from your browser (<span className="font-mono">{RPC_HTTP.replace("https://", "")}</span>). No Turn server, no account, no key needed.

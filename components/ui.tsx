@@ -16,7 +16,7 @@ export function Shell({ children, back }: { children: ReactNode; back?: string }
           {back && (
             <Link href={back} className="-ms-2 rounded-full px-2 py-1 text-sm text-ink-muted hover:text-ink" aria-label={t("back")}>←</Link>
           )}
-          <Link href="/" className="inline-flex items-center gap-2" aria-label="Turn">
+          <Link href="/app" className="inline-flex items-center gap-2" aria-label="Turn">
             <TurnMark size={28} />
             <span lang="en" className="font-display text-[1.35rem] leading-none font-semibold tracking-tight">Turn</span>
           </Link>

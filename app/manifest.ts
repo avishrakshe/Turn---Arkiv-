@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Turn: savings committees",
     short_name: "Turn",
     description: "Your committee's shared record, kept by every member.",
-    start_url: "/?source=pwa",
+    start_url: "/app?source=pwa",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
