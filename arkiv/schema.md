@@ -1,192 +1,217 @@
-# Turn on Arkiv — entity schema
+# Turn on Arkiv: entity schema (as built)
 
-> Status: **Phase 1 draft** (2026-10-15). Will be updated to "as built" at the end of Phase 5.
 > SDK `@arkiv-network/sdk@0.8.1`, `arkiv-encryption@0.1.0`, network **Tiramisu** (chain `7738577`).
+> Source of truth in code: [`src/arkiv/writer.ts`](../src/arkiv/writer.ts) (what is written),
+> [`src/arkiv/records.ts`](../src/arkiv/records.ts) (what a reader accepts),
+> [`src/core/lease.ts`](../src/core/lease.ts) (expirations).
 
-Turn keeps money on UPI/cash and uses Arkiv as the shared, tamper-evident ledger of a savings
-committee (BC / kitty / chit). Every record is created by the member it speaks for, is `readonly`,
-and carries an encrypted payload that only circle members can read.
+Turn keeps money on UPI or cash and uses Arkiv as the shared, tamper-evident ledger of a savings
+committee (BC, kitty, chit). Each record is created by the member it speaks for. Every record except
+the invite is `readonly`, and its payload is encrypted with the circle key.
 
-## Conventions (apply to every entity)
+## Trust model in one paragraph
+
+**`$creator` decides who said something; `$owner` is never trusted.** A reader takes the organiser's
+address from the invite link and fetches only the organiser's records. After the roster exists, it
+fetches only records created by the roster's addresses (`$creator = a OR …`), so records from
+anyone else are never fetched or decrypted. They are only counted ("1 unverified record ignored").
+A payment counts as **confirmed** only when two records exist: a `pay_claim` created by the payer,
+and a `pay_ack` referencing that claim, created by **that round's collector**. Every decrypted
+payload repeats `t, c, by, r` (type, circle, creator, round), and the reader rejects any mismatch
+with the entity's public metadata. So a valid ciphertext can't be replayed into another circle,
+round or member's entity.
+
+## Conventions (every entity)
 
 | Item | Value | Why |
 |---|---|---|
-| `project` | `str("turn_v1")` | Namespace for all queries. Not authentication. |
-| `entity_type` | `str(...)`, one of the types below | Query by record kind. |
-| `circle_id` | `str`, 32 lowercase hex chars (128 random bits) | Groups a committee's records without revealing anything about it. Random, so it can't be guessed or linked to people. |
-| `created_at` | `u64(Date.now())` (ms) | Client time for display only. **Never trusted for ordering** — ordering uses the chain's `createdAt` block. |
-| Content type | `application/vnd.arkiv.encrypted.v1` (from `arkiv-encryption`) | Every payload except `bid_commit` is AES-256-GCM ciphertext. |
-| Payload framing | `u32 length ‖ UTF-8 JSON ‖ zero padding` to a bucket of 256 / 512 / 1024 / 2048 / 4096 bytes, then encrypted | Ciphertext length reveals only the bucket, not whether an amount is ₹1,000 or ₹10,000 or how long a note is. |
-| Payload binding | Every decrypted payload carries `v` (schema version), `t` (entity_type), `c` (circle_id), `by` (creator address) and `r` (round, where applicable). The reader rejects the entity if any differs from the entity's public attributes / chain `creator`. | `arkiv-encryption` has no associated data, so a valid envelope could be replayed into another entity. Binding makes copies from another circle, type, round or member fail closed. |
-| Flags | `readonly: true`, `permissionlessExtension: false` on every record except `invite` | A record can never be edited after the fact. Corrections are new records. Nobody outside the circle can keep records alive. |
-| Attribute names | lowercase `[a-z][a-z0-9_]*` | Tiramisu rejects uppercase (`Ident32InvalidByte`). |
+| `project` | `str("turn_arkiv_v1")` | Namespace. Not authentication. |
+| `entity_type` | `str`, one of the types below | Query by record kind. |
+| `circle_id` | `str`, 32 lowercase hex chars (128 random bits) | Groups one committee's records. Random, so it reveals nothing and can't be guessed. |
+| `created_at` | `u64(Date.now())`, ms | Display only. Ordering uses the chain's `createdAt` block. |
+| `op_id` | `str`, 32 hex chars, random per write | Idempotency: after an ambiguous write we look for this op_id before anything else, and readers keep one record per `(creator, op_id)`. |
+| Content type | `application/vnd.arkiv.encrypted.v1` (`arkiv-encryption`) | AES-256-GCM, key = circle key. `bid_commit` alone has an empty payload (`application/octet-stream`). |
+| Payload framing | `u32 length ‖ UTF-8 JSON ‖ zero padding` to 256 / 512 / 1024 / 2048 / 4096 bytes, then encrypted | Ciphertext length shows only the bucket, never whether an amount is ₹1,000 or ₹10,000. |
+| Payload binding | decrypted JSON carries `v, t, c, by, r` | `arkiv-encryption` has no associated data, so we bind in the plaintext (see friction #3). |
+| Attribute names | `[a-z][a-z0-9_]*` | Tiramisu rejects uppercase. |
 
-**Never in attributes:** names, phone numbers, UPI IDs, amounts, notes, member counts, or anything
-typed by a person. Attributes hold only random ids, round numbers, entity keys, hashes and booleans.
+**Never in attributes:** names, phone numbers, UPI IDs, amounts, notes, reasons. Attributes hold
+random ids, round numbers, due dates, entity keys, booleans and (roster only) member addresses, which
+are already public as the creators of the circle's records.
+**Never on Arkiv at all:** private keys, the circle key, real identities, UPI IDs, money.
 
-**Never on Arkiv at all:** private keys, the circle encryption key, real identities, UPI IDs, money.
+## Flags, owner and creator
 
-## Expiration
+| Group | Types | `readonly` | `permissionlessExtension` | Why |
+|---|---|---|---|---|
+| Lease records | `circle`, `roster`, `member`, `pay_claim`, `pay_ack`, `dispute`, `round_result`, `bid_close`, `bid_reveal` | ✓ | ✓ | No one, not even the creator, can edit a record after the fact; corrections are new records. **Any member can renew the lease**, so an organiser who vanishes can't let the evidence expire. |
+| Invite | `invite` | ✗ | ✗ | The organiser may update `seats_left`. It is meant to die. |
+| Sealed bid | `bid_commit` | ✓ | ✗ | Short-lived by design; nobody needs to keep it alive. |
 
-Let `P` be the round period (monthly = 30 days, weekly = 7 days, demo = 10 minutes), `N` the number
-of members (= number of rounds).
+A reader **rejects** a record whose flags differ from this table (`reason: "flags"`). This stops a
+member from publishing a lease record that only they could keep alive.
 
-| Name | Value |
-|---|---|
-| **circle deadline** | `circle` is created with `ExpirationTime.fromDays(ceil(N·P / 1 day) + 90)` (at least 90 days after the last round). Its receipt-decoded `expiresAt` block is stored in the circle view. |
-| **as circle** | `ExpirationTime.atBlock(circle.expiresAt, { atLeast: fromDays(1) })` — every later record dies with the circle, not before. |
+Owner = creator at creation for every type. Turn never trusts `$owner`. An ownership change (organiser
+handover, `changeOwnership`) changes only who *manages* the circle entity, shown as "Created by X ·
+Managed by Y". Trust stays with the immutable `$creator`.
+
+## Entity Expiration (per type, product logic)
+
+Let `P` = round period (monthly 30 d, weekly 7 d, demo 10 min), `N` = members = rounds.
+
+| Type | Expiration | Product reason |
+|---|---|---|
+| `invite` | `ExpirationTime.fromHours(48)` | An old WhatsApp link stops working by itself. The join screen refuses an expired invite. |
+| `bid_commit` | reveal window end + 1 day, at least 2 days (`fromBlocks`) | Only needed until bids are opened. |
+| `circle` | **scheduled end of the last round + 30 days**: `fromBlocks((start + N·P − now + 30 d) / 2 s)` | The record must outlive the committee, with a month for late disputes. |
+| every other lease record | `ExpirationTime.atBlock(circle.expiresAt, { atLeast: fromDays(1) })` ("as circle") | Dies with the circle, never before. |
+
+The circle screen shows "Record kept until <date>". That is the earliest deadline among the circle's
+records, converted at 2 s/block.
+
+### Lifetime Extension (a lease renewed by activity, and by anyone)
+
+| Trigger | Who | Target (absolute block, same for every record) | Code |
+|---|---|---|---|
+| Closing a round | organiser | `head + (max(scheduled end, now + remaining rounds · P) − now + 30 d)`: committees that run late keep their record longer | `leaseTargetBlock`, `closeRound` |
+| "Keep our record alive" | **any member** (permissionless extension) | `max(latest deadline, head) + 90 days` | `keepAliveTargetBlock`, `keepAlive` |
+
+Both run as **one atomic `executeBatch`**. The batch extends only records whose deadline is earlier
+than the target, because the engine rejects an extension that doesn't move the deadline later, and one
+rejection fails the whole batch. Closing a round puts the `round_result` create and the extensions in
+the same batch, so the result and the renewal land together or not at all.
 
 ## Entity types
 
-### `circle` — the committee rules
-
-| | |
-|---|---|
-| Creator / owner | organiser |
-| Flags | readonly |
-| Expiration | circle deadline |
-| Attributes | common only |
-| Payload (encrypted) | `{ v, t, c, by, name, template, amount_inr, members, frequency: "monthly"\|"weekly"\|"demo", mode: "fixed"\|"bid", start_ms, due_days, max_discount_bps, reveal_window_ms, organiser_first }` |
-| Why | The rules everyone agreed to. Readonly, so the organiser cannot quietly change the amount or order later; a "rule change" would have to be a new circle everyone can see. |
-
-### `invite` — join window
-
+### `circle`: the rules
 | | |
 |---|---|
 | Creator | organiser |
-| Flags | none (organiser may patch `seats_left`) |
-| Expiration | `fromHours(48)` |
 | Attributes | common only |
-| Payload (encrypted) | `{ v, t, c, by, seats_left }` |
-| Why | Clients refuse to join a circle whose invite entity has expired, so a leaked old link stops working after 48 h without any server. |
+| Payload | `{ name, template, amount_inr, members, frequency, mode, start_ms, due_days, max_discount_bps, reveal_window_ms, organiser_first }` |
+| Why | The rules everyone agreed to. Readonly, so the organiser can't quietly change the amount or order. The earliest `circle` entity for a `circle_id` wins; a later copy by anyone is ignored. |
 
-The invite **link** is `https://<app>/#/join?c=<circle_id>&o=<organiser address>&k=<circle key>`.
-Everything after `#` stays in the browser — it is never sent to Vercel or to Arkiv.
-
-### `member` — "I joined"
-
-| | |
-|---|---|
-| Creator | the joining member |
-| Flags | readonly |
-| Expiration | as circle |
-| Attributes | common only |
-| Payload (encrypted) | `{ v, t, c, by, display_name, lang }` — synthetic names only in this project |
-| Why | Each member publishes their own membership from their own address, so the organiser cannot invent members. |
-
-### `roster` — who is in, and in what order
-
+### `invite`: join window
 | | |
 |---|---|
 | Creator | organiser |
-| Flags | readonly |
-| Expiration | as circle |
-| Attributes | common only |
-| Payload (encrypted) | `{ v, t, c, by, members: [address…], member_keys: [member entity key…] }` — index = turn order for fixed mode |
-| Why | Written once joins close. From then on clients **trust only entities created by roster addresses** (creator-scoped queries `$creator = addr(a) OR …`). Spam from anyone else is never fetched. The roster must be the organiser's earliest `roster` for the circle and every listed member must have a matching `member` entity. |
+| Payload | `{ seats_left }` |
+| Link | `https://<app>/join#c=<circle_id>&o=<organiser>&k=<circle key>`. Everything after `#` stays in the browser and is never sent to Vercel or Arkiv. |
 
-### `pay_claim` — "I've paid"
+### `member`: "I joined"
+| | |
+|---|---|
+| Creator | the joining member (their own key) |
+| Payload | `{ display_name, lang }`. Synthetic names only in this project. |
+| Why | Members publish their own membership, so the organiser can't invent members. |
 
+### `roster`: who is in, in turn order
+| | |
+|---|---|
+| Creator | organiser |
+| Attributes | common + `member_count: u64`, `m1 … mN: addr` (public turn order; `m_r` collects round `r`) |
+| Payload | `{ members: [address…], member_keys: [member entity key…] }`. It must equal `m1…mN` or the roster is rejected. |
+| Valid when | organiser's earliest roster after the circle; contains the organiser; size ≤ `members`; every listed address has its own `member` record whose key matches and that predates the roster |
+| Why | From here on, only these wallets' records count. Turn order is public so **anyone can verify payments without the circle key** (`/verify`); names and amounts stay encrypted. |
+
+### `pay_claim`: "I've paid"
 | | |
 |---|---|
 | Creator | payer |
-| Flags | readonly |
-| Expiration | as circle |
-| Attributes | common + `round: u64` |
-| Payload (encrypted) | `{ v, t, c, by, r, amount_inr, method: "UPI"\|"cash", note? }` |
-| Why | The payer's own signed statement. Alone it is only "claimed". |
+| Attributes | common + `round: u64`, `due_at: u64` (ms; must equal the round's due time from the rules or the record is rejected) |
+| Payload | `{ amount_inr, method: "UPI"\|"cash", note }` |
+| Why | The payer's own signed statement. Alone it shows "Says paid · waiting for <collector>". |
 
-### `pay_ack` — "Received"
-
+### `pay_ack`: "Received"
 | | |
 |---|---|
-| Creator | the round's collector (the round's pot recipient — members pay the recipient directly) |
-| Flags | readonly |
-| Expiration | as circle |
-| Attributes | common + `round: u64`, `ref_key: key` (the `pay_claim` key), `on_time: bool` |
-| Payload (encrypted) | `{ v, t, c, by, r, ref, status: "received" }` |
-| Why | Two-party confirmation: a payment is **confirmed** only when a `pay_claim` by the payer *and* a `pay_ack` referencing it by that round's collector both exist. An ack from anyone else is ignored. `on_time` is the collector's public attestation (used by Turn Score without decrypting anything). |
+| Creator | the round's collector (`m_r`): members pay the round's recipient directly |
+| Attributes | common + `round: u64`, `due_at: u64`, `ref_key: key` (the claim), `on_time: bool` |
+| Payload | `{ ref, status: "received" }` (`ref` must equal `ref_key`) |
+| Why | Two-party confirmation. An ack from anyone except that round's collector is ignored. |
 
-### `bid_commit` — sealed bid
-
+### `dispute`: "Something's wrong"
 | | |
 |---|---|
-| Creator | bidder |
-| Flags | readonly |
-| Expiration | `fromDays(...)` = estimated end of the round's reveal window + 1 day (minimum 2 days) |
-| Attributes | common + `round: u64`, `commit: bytes32` |
-| Payload | empty (`application/octet-stream`) |
-| `commit` | `keccak256(abi.encode(uint32 discount_bps, bytes32 salt, string circle_id, uint64 round, address bidder))` |
-| Salt | `keccak256(signMessage("Turn on Arkiv bid salt v1\ncircle:<id>\nround:<r>"))` — secp256k1 signatures are deterministic (RFC 6979), so the same account re-derives the salt on any device. |
-| Why | Nobody, including the organiser, can see bids until they are revealed, and nobody can change a bid after seeing others. Short expiry: once revealed (or forfeited), the commit is no longer needed. |
+| Creator | any roster member (owned by them, so the organiser can't delete it) |
+| Attributes | common + `round: u64`, `ref_key: key` (the disputed claim, ack or result) |
+| Payload | `{ reason: "not_received"\|"wrong_amount"\|"wrong_result"\|"other", note }` |
+| Why | A permanent, visible objection. Payment state precedence: disputed > confirmed > claimed. |
 
-### `bid_close` — bidding closed *(added in Phase 1; not in the original brief)*
-
+### `round_result`: who took the pot
 | | |
 |---|---|
 | Creator | organiser |
-| Flags | readonly |
-| Expiration | as circle |
-| Attributes | common + `round: u64` |
-| Payload (encrypted) | `{ v, t, c, by, r }` |
-| Why | Commit-reveal needs an agreed moment when commits stop and reveals start. Wall-clock attributes are forgeable; the chain's block number of this entity is not. Commits count only if created **before** this block, reveals only **after** it. The organiser gains nothing by choosing the moment because bids are still sealed. Earliest `bid_close` per round wins. |
-
-### `bid_reveal` — opening a bid
-
-| | |
-|---|---|
-| Creator | bidder (must match the commit's creator) |
-| Flags | readonly |
-| Expiration | as circle |
-| Attributes | common + `round: u64`, `ref_key: key` (the `bid_commit` key) |
-| Payload (encrypted) | `{ v, t, c, by, r, discount_bps, salt }` |
-| Why | Anyone in the circle recomputes the hash; a reveal that doesn't match its commit, comes from another address, exceeds `max_discount_bps`, or comes from a member who already won, is invalid. |
-
-### `round_result` — who takes the pot
-
-| | |
-|---|---|
-| Creator | organiser |
-| Flags | readonly |
-| Expiration | as circle |
 | Attributes | common + `round: u64`, `is_final: bool` |
-| Payload (encrypted) | `{ v, t, c, by, r, winner, discount_bps, payout_inr, share_inr, close_key?, reveal_keys[] }` |
-| Why | The organiser announces; **every client recomputes** from the circle rules, roster, previous results, commits and reveals, and shows "Verified ✓" or "Mismatch ⚠". `is_final` lets Turn Score count completed circles without decrypting. |
+| Payload | `{ winner, discount_bps, payout_inr, share_inr, close_key, reveal_keys }` |
+| Why | Every client recomputes the winner from the roster (fixed order: `m_r`) and flags "⚠ The result doesn't match the turn order". |
 
-Rules recomputed by clients:
-- *fixed* mode: winner = `roster.members[r-1]`, discount 0.
-- *bid* mode: round 1 → organiser at 0 % if `organiser_first`; last round → the only member who hasn't won; otherwise highest valid `discount_bps`, ties → earliest commit block (then lower entity key). No valid reveal → earliest-in-order eligible member at 0 %.
-- If the result was published before `close + reveal_window` while a valid commit was still unrevealed → "Mismatch ⚠ (closed early)".
-- `share_inr = floor(pot · bps / 10000 / (N − 1))`; each other member pays `amount_inr − share_inr` that round ("₹384 off your next payment"); winner receives `(N − 1) · (amount_inr − share_inr)`.
+### `bid_commit` / `bid_close` / `bid_reveal` (sealed bids)
+Schema and reader validation exist. **The bidding UI is not built** (feature 11 was cut first). See
+[docs/decisions.md](../docs/decisions.md).
 
-### `dispute` — "Something's wrong"
+## Every query the app runs
 
-| | |
+All reads are pinned with `.atBlock(head)` and walked page by page (`limit(200)`, `page.next()` cursor),
+restarting once on an expired cursor ([`src/arkiv/reader.ts`](../src/arkiv/reader.ts)). Arkiv has
+no server-side ordering, so results are sorted on the client by `(createdAt block, key)`.
+
+Raw strings are exactly what the SDK sends as `arkiv_query` params (from a logged request).
+
+**Q1. Organiser's records** (circle screen, join screen; [`circle.ts`](../src/arkiv/circle.ts))
+```ts
+client.select({ key, owner, creator, createdAt, expiresAt, creationFlags, contentType, payload, attributes })
+  .where([eq("project", str("turn_arkiv_v1")), eq("circle_id", str(CIRCLE)), or([eq("$creator", addr(ORGANISER))])])
+  .atBlock(head).limit(200).fetch()
+```
+`project = str('turn_arkiv_v1') AND circle_id = str('<CIRCLE>') AND $creator = addr(<ORGANISER>)`
+
+**Q2. Roster members' records** (only the wallets the roster names)
+`project = str('turn_arkiv_v1') AND circle_id = str('<CIRCLE>') AND ($creator = addr(<m2>) OR … OR $creator = addr(<mN>))`
+
+**Q3. What the scope left out** (count only: `select({ key, creator, attributes })`, no payload)
+`project = str('turn_arkiv_v1') AND circle_id = str('<CIRCLE>')`
+
+**Q4. Joins before the roster exists** (any creator; validated by decryption + binding)
+`project = str('turn_arkiv_v1') AND circle_id = str('<CIRCLE>') AND entity_type = str('member')`
+
+**Q5. Who hasn't paid** (organiser; [`queries.ts`](../src/arkiv/queries.ts)). A compound query with
+`u64` ranges on typed attributes, attributes only, and cursor pages of 100:
+```ts
+client.select({ key: true, creator: true, attributes: { round: true, due_at: true } })
+  .where([eq("project", str("turn_arkiv_v1")), eq("entity_type", str("pay_claim")), eq("circle_id", str(CIRCLE)),
+          lte("due_at", u64(NOW_MS)), gte("round", u64(FIRST_DUE)), lte("round", u64(LAST_DUE)),
+          or(ROSTER.map((m) => eq("$creator", addr(m))))])
+  .atBlock(head).limit(100).fetch()
+```
+`project = str('turn_arkiv_v1') AND entity_type = str('pay_claim') AND circle_id = str('<CIRCLE>') AND due_at <= u64(<NOW_MS>) AND round >= u64(<FIRST>) AND round <= u64(<LAST>) AND ($creator = addr(<m1>) OR …)`
+Late = every (round, member ≠ collector) in the due rounds with no claim.
+
+**Q6. Write reconciliation** (after an ambiguous write; [`writer.ts`](../src/arkiv/writer.ts))
+`project = str('turn_arkiv_v1') AND op_id = str('<OP_ID>')` + `.createdBy(<ME>)`, `limit(5)`
+
+**Q7. `/verify`, keyless** ([`public-ledger.ts`](../src/arkiv/public-ledger.ts)). Selects
+`key, creator, createdAt, expiresAt, creationFlags, attributes`, never the payload:
+1. `… AND circle_id = str('<CIRCLE>') AND entity_type = str('circle')` (optionally `AND $creator = addr(<ORGANISER>)`); the earliest wins and its creator is the organiser.
+2. `… AND entity_type = str('roster') AND $creator = addr(<ORGANISER>)`, then `getEntity(rosterKey)` for `m1…mN`.
+3. Q2 over `m1…mN`, then Q3 for the ignored count.
+
+**Single-entity reads:** `getEntity(circleKey)` right after creating a circle, to read its real
+`expiresAt` (other records die with it).
+
+**Live updates** ([`lib/live.ts`](../lib/live.ts)): `eventsClient().watchEntityEvents({ onEntityCreated, onExpiryExtended, onOwnershipTransferred, onError })`
+over `webSocket("wss://rpc.tiramisu.db-chain.testnet.arkiv.network")`, **no `fromBlock`**. Events
+carry keys only. A create whose `owner` (= creator at creation) is a circle participant, or an
+extension/transfer of a known key, triggers a coalesced re-read (Q1–Q3), at most every 8 s.
+
+## What is public on the explorer
+
+| Anyone reading Tiramisu sees | Only circle members see (encrypted) |
 |---|---|
-| Creator | any roster member |
-| Flags | readonly |
-| Expiration | as circle |
-| Attributes | common + `round: u64`, `ref_key: key` (the disputed `pay_claim`, `pay_ack` or `round_result`) |
-| Payload (encrypted) | `{ v, t, c, by, r, reason: "not_received"\|"wrong_amount"\|"wrong_result"\|"other", note? }` |
-| Why | A permanent, visible objection. Payment state precedence: **disputed** > confirmed > claimed. |
+| That an address created a Turn record of a type, in a random `circle_id`, at a block | Committee name, amount, frequency, rules |
+| Round numbers, round due dates (`due_at`), claim↔ack links (`ref_key`), `on_time`, `is_final` | Display names, languages |
+| The roster's member addresses in turn order (already visible as the circle's writers) | Payment amounts, methods, notes |
+| Which addresses write in the same `circle_id` | Dispute reasons and notes, winners and payouts |
+| Ciphertext size bucket, timing, expiry | — |
 
-## Queries (all pinned with `.atBlock(head)` and walked page by page)
-
-| Purpose | Predicates |
-|---|---|
-| Circle | `project, entity_type="circle", circle_id` + `createdBy(organiser from invite)` |
-| Joins (before roster) | `project, entity_type="member", circle_id` (any creator; validated by decryption + binding; organiser picks) |
-| Roster | `project, entity_type="roster", circle_id` + `createdBy(organiser)` |
-| Circle records | `project, circle_id, entity_type ∈ {…}` + `or($creator = addr(m₁), …)` over roster members |
-| Turn Score (public, keyless) | `project, entity_type="pay_claim"` + `createdBy(address)`; acks by `ref_key`; finals by `is_final=true` + circle creator |
-
-## What is public vs private
-
-| Public (anyone reading Tiramisu) | Private (circle key holders only) |
-|---|---|
-| That an address created a Turn record of a given type, in a random `circle_id`, at a block | Circle name, amount, member count, frequency, rules |
-| Round numbers, entity keys, ack `on_time` flag, `is_final` flag, bid commit hashes | Display names, languages, payment amounts, methods, notes |
-| Which addresses interact in the same `circle_id` (the membership graph) | Bid discounts and salts (until revealed — and then only to members) |
-| Ciphertext length (bucketed), timing, expiry | Dispute reasons and notes |
-
-The circle key lives only in the invite link fragment and in each member's browser storage.
+The circle key exists only in the invite link fragment and on members' devices.
