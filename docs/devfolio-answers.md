@@ -128,14 +128,15 @@ WebSocket entity events for live updates; atomic batches.
 ### 6. Wallet addresses that create your Arkiv entities *
 See <https://github.com/avishrakshe/Turn---Arkiv-/blob/main/arkiv/addresses.md>. Summary: dev/drip EOA
 `0x6345b733AE620EEDD74Ac1C628e96B27ABB3B2CF` (smoke-test organiser, GLM drips); seeded demo
-"Sharma Family BC" organiser `<Meera>` and members `<Ravi, Priya, Arjun, Sana>`; live-app members
+"Sharma Family BC" organiser `0x0cbaaccdcf158845b04d0e770c75248084365e40` (Meera) and four members
+(Ravi `0x9b29…ef00`, Priya `0xa004…0abf`, Arjun `0x5359…9b78`, Sana `0x228a…cd3`); live-app members
 create from their own browser keys.
 
 ### 7. Link to /arkiv/schema.md *
 <https://github.com/avishrakshe/Turn---Arkiv-/blob/main/arkiv/schema.md>
 
 ### 8. How can judges reproduce your Arkiv usage? *
-1. Open `<https://turn-arkiv.vercel.app/verify#c=<CIRCLE_ID>&o=<ORGANISER>>`: the seeded committee read
+1. Open <https://turn-arkiv.vercel.app/verify#c=d2ccb6e40b03bc6280b8ea95df17536e&o=0x0cbaaccdcf158845b04d0e770c75248084365e40>: the seeded committee read
    keyless from Tiramisu (round 1 confirmed; round 2 claimed / disputed / unpaid). Expand "Queries
    this page ran".
 2. Run the README's `curl` (section "Read the ledger without Turn") with the same `circle_id`: the
@@ -155,7 +156,7 @@ relayer, Monad, AUSD or EIP-7702 code.
 
 ### 10. Arkiv surfaces you used *
 TypeScript SDK · Direct JSON-RPC (curl in README, debugging) · WebSocket events · Docs · Hub ·
-Faucet · Block Explorer · Arkiv skills. `<Access keys: if ARKIV_API_KEY is configured>`
+Faucet · Access keys (server-side `/api/rpc` fallback and scripts) · Block Explorer · Arkiv skills.
 
 ### 12. How long after you started did you write your first Arkiv entity? *
 More than a day. Code was ready on day 1 (15 Oct), but the dev account wasn't funded until 17 Oct; the

@@ -28,8 +28,8 @@ shared notebook nobody can rewrite:
 
 ## What to try (2 minutes)
 
-1. Open the **demo committee** read-only: `/verify#c=<CIRCLE_ID>&o=<ORGANISER>` (see
-   [Seeded demo](#seeded-demo)). Round 1 is confirmed by Meera, round 2 has a claim waiting, a dispute
+1. Open the **demo committee** read-only:
+   <https://turn-arkiv.vercel.app/verify#c=d2ccb6e40b03bc6280b8ea95df17536e&o=0x0cbaaccdcf158845b04d0e770c75248084365e40>. Round 1 is confirmed by Meera, round 2 has a claim waiting, a dispute
    by Ravi, and Sana hasn't paid.
 2. Start your own: **Start → Start a committee → "Demo (every 10 minutes)" with 3 members**. Share the
    link to two other browsers or phones (each browser/profile is one member), join, pay, confirm. The
@@ -88,8 +88,9 @@ month, each with their own key (kept in git-ignored `.seed/`):
   ("Received ₹4,000, not ₹5,000") · Sana not paid and past due ("Who hasn't paid")
 - Sana (a member, not the owner) presses **Keep our record alive**: every record is extended in one batch
 
-The seeded committee: see [arkiv/addresses.md](arkiv/addresses.md) for its `circle_id`, every
-creating address and its role.
+Seeded on 2026-10-17: `circle_id = d2ccb6e40b03bc6280b8ea95df17536e`, organiser
+`0x0cbaaccdcf158845b04d0e770c75248084365e40`. Every creating address and its role:
+[arkiv/addresses.md](arkiv/addresses.md).
 
 ## Read the ledger without Turn
 
@@ -109,7 +110,9 @@ import { addr, str } from "@arkiv-network/sdk/attr"
 import { eq, or } from "@arkiv-network/sdk/query"
 import { http } from "viem"
 
-const client = createPublicClient({ chain: tiramisu, transport: http() })
+// retryCount 0: on HTTP 429 (anonymous budget) fail fast instead of sleeping on Retry-After.
+// With an access key: http(undefined, { retryCount: 0, fetchOptions: { headers: { "X-API-KEY": KEY } } })
+const client = createPublicClient({ chain: tiramisu, transport: http(undefined, { retryCount: 0 }) })
 const CIRCLE = "<circle_id>", ORGANISER = "<organiser address>"
 const base = [eq("project", str("turn_arkiv_v1")), eq("circle_id", str(CIRCLE))]
 
@@ -138,7 +141,7 @@ wallets, keys and public attributes only:
 
 ```bash
 RPC=https://rpc.tiramisu.db-chain.testnet.arkiv.network
-CIRCLE=<circle_id>; ORGANISER=<organiser address>
+CIRCLE=d2ccb6e40b03bc6280b8ea95df17536e; ORGANISER=0x0cbaaccdcf158845b04d0e770c75248084365e40
 
 # a) the roster: public turn order in attributes m1..mN
 curl -s $RPC -H 'content-type: application/json' -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"arkiv_query\",
