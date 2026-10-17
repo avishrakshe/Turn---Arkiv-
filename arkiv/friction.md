@@ -53,7 +53,10 @@ anonymous RPC `https://rpc.tiramisu.db-chain.testnet.arkiv.network`.
   screen load ran 3–4 block-pinned `arkiv_query` walks with `payload` selected, plus a watcher that
   re-read the circle on every relevant event. Then, from Node:
   `client.select({...}).where([project, circle_id, $creator]).limit(200).fetch()`.
-- **Observed:** the call never returned (killed after 120 s; twice). With `onFetchResponse` logging and
+- **Observed:** the call appeared to hang. Two runs left in the background (transport
+  `http(url, { retryCount: 1, timeout: 15_000 })`) eventually **succeeded after 1,946,435 ms (32.4 min)
+  and 2,046,438 ms (34.1 min)** for a single `fetch()` of 3 entities. That is the 15 s timeout plus
+  viem waiting out `Retry-After`, then retrying once after the window reset. With `onFetchResponse` logging and
   `retryCount: 0` the cause appeared immediately:
   ```
   HTTP 429
