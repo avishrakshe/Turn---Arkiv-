@@ -54,7 +54,8 @@ export async function drip(config: DripConfig, recipient: string): Promise<DripR
     reader.getBalance({ address: to }),
     reader.getTransactionCount({ address: to }),
   ])
-  if (balance >= parseEther(config.maxRecipientBalanceGlm)) return { status: "refused", reason: "already_funded" }
+  // Any balance at all means this address was already dripped (or funded elsewhere): one drip only.
+  if (balance > 0n || balance >= parseEther(config.maxRecipientBalanceGlm)) return { status: "refused", reason: "already_funded" }
   if (sent > 0) return { status: "refused", reason: "already_used" }
 
   const value = parseEther(config.amountGlm)

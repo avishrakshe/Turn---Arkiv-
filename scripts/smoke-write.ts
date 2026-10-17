@@ -121,4 +121,4 @@ async function main() {
   console.log(`\nSMOKE OK  circle_id=${circleId} organiser=${org.address}`)
 }
 
-main().catch((e) => { console.error("SMOKE FAILED:", e instanceof Error ? e.message : e); process.exit(1) })
+main().then(() => process.exit(0), (e) => { console.error("SMOKE FAILED:", e instanceof Error ? e.message : e); process.exit(1) })
