@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
-import { Button, Card, Shell, short } from "@/components/ui"
+import { Button, Card, PageHeader, Shell, short } from "@/components/ui"
 import { useApp } from "@/components/providers"
 import { accountInfo, exportBackup, importBackup } from "@/lib/account"
 import { useT } from "@/lib/i18n"
@@ -21,10 +21,10 @@ export default function Settings() {
   useEffect(() => { accountInfo().then(setInfo) }, [account])
 
   return (
-    <Shell back="/app">
-      <h1 className="text-[1.8rem]">{t("settings")}</h1>
+    <Shell back="/app" width="lg">
+      <PageHeader eyebrow="Turn" title={t("settings")} />
       <Card className="flex flex-col gap-2">
-        <p className="font-semibold">{t("language")}</p>
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#e8562a]">{t("language")}</p>
         <div className="grid grid-cols-2 gap-2">
           <Button tone={lang === "en" ? "teal" : "quiet"} onClick={() => setLang("en")}>English</Button>
           <Button tone={lang === "hi" ? "teal" : "quiet"} onClick={() => setLang("hi")}>हिन्दी</Button>
@@ -33,9 +33,9 @@ export default function Settings() {
 
       {info && (
         <Card className="flex flex-col gap-2">
-          <p className="font-semibold">{t("myAddress")}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#e8562a]">{t("myAddress")}</p>
           <a className="font-mono text-sm text-teal-ink underline" href={`${EXPLORER}/address/${info.address}`} target="_blank" rel="noreferrer">{short(info.address)}</a>
-          <p className="font-semibold">{t("backup")}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#e8562a]">{t("backup")}</p>
           <p className="text-sm text-ink-muted">{t("backupHint")}</p>
           <Button tone="quiet" onClick={async () => {
             const text = await exportBackup()
@@ -48,7 +48,7 @@ export default function Settings() {
         </Card>
       )}
       <Card className="flex flex-col gap-2">
-        <p className="font-semibold">{t("restore")}</p>
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#e8562a]">{t("restore")}</p>
         <input type="file" accept="application/json" className="text-sm" onChange={async (e) => {
           const f = e.target.files?.[0]
           if (!f) return
@@ -58,7 +58,7 @@ export default function Settings() {
       </Card>
 
       <Card className="flex flex-col gap-3">
-        <p className="font-semibold">{t("whatsPublic")}</p>
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#e8562a]">{t("whatsPublic")}</p>
         <div className="overflow-x-auto">
           <table className="w-full text-start text-sm">
             <thead><tr className="text-ink-muted"><th className="pb-2 pe-3 text-start font-medium">Anyone on the explorer sees</th><th className="pb-2 text-start font-medium">Only members (encrypted)</th></tr></thead>

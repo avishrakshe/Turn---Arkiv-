@@ -6,7 +6,7 @@
  * decrypts names, locally.
  */
 import { useEffect, useState } from "react"
-import { Button, Card, Field, inputCls, Loading, Pill, Shell, short } from "@/components/ui"
+import { Button, Card, Field, inputCls, Loading, PageHeader, Pill, Shell, short } from "@/components/ui"
 import { isRateLimited, publicClient } from "@/src/arkiv/client"
 import { EXPLORER, RPC_HTTP } from "@/src/arkiv/config"
 import { importCircleKey } from "@/src/arkiv/payload"
@@ -62,8 +62,8 @@ export default function Verify() {
 
   const who = (a: string) => names.get(a) ?? short(a)
   return (
-    <Shell back="/app">
-      <h1 className="text-[1.8rem]">Read the ledger without Turn</h1>
+    <Shell back="/app" width="lg">
+      <PageHeader eyebrow="Verify · no Turn server" title="Read the ledger without Turn" />
       <p className="text-sm text-ink-muted">
         This page asks Arkiv directly from your browser (<span className="font-mono">{RPC_HTTP.replace("https://", "")}</span>). No Turn server, no account, no key needed.
         A payment counts as confirmed only if the payer&apos;s claim and the collector&apos;s receipt were each created by the right wallet from the committee&apos;s list.

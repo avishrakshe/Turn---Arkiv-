@@ -1,13 +1,12 @@
 "use client"
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, Card, formatDate, Loading, Pill, Shell, Stamp, short } from "@/components/ui"
+import { Arrow, Button, Card, DarkPanel, formatDate, HeroPanel, Loading, PageHeader, Pill, SectionTitle, Shell, Stamp, short } from "@/components/ui"
 import { useApp } from "@/components/providers"
 import { ShareInvite } from "@/components/share"
 import { DisputeSheet } from "@/components/dispute"
 import { Seal } from "@/components/seal"
 import { ProgressRing } from "@/components/ring/ProgressRing"
-import { TurnRing } from "@/components/ring/TurnRing"
 import { ackPayment, closeRound, keepAlive, lockRoster, payClaim, reader, snapshot, WriteFailed } from "@/lib/actions"
 import { getCircle, type SavedCircle } from "@/lib/circles"
 import { useT, type MsgKey } from "@/lib/i18n"
@@ -112,82 +111,99 @@ export default function CirclePage() {
   }
 
   const cur = view.current
-  const ringMembers = view.members.map((m) => {
-    const p = cur?.payments.find((x) => x.payer === m.address)
-    return { name: m.name, status: (!p ? "paid" : p.state === "confirmed" ? "paid" : p.state === "disputed" ? "late" : "pending") as "paid" | "pending" | "late" }
-  })
+  const pot = fixedPayout(view.rules, view.members.length)
 
   return (
-    <Shell back="/app">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[1.8rem]">{view.rules.name}</h1>
-          <p className="tabular text-sm text-ink-muted">{inr(view.rules.amount_inr)} × {view.rules.members} · {t(view.rules.frequency as MsgKey)}</p>
-        </div>
-        {view.rounds.length > 0 && <ProgressRing round={cur?.round ?? view.rounds.length} total={view.rounds.length} yourTurn={cur?.collector === me} />}
-      </div>
-      <p className="flex items-center gap-2 text-xs text-ink-muted">
-        <span className={`inline-block size-2 rounded-full ${live ? "live-dot bg-success" : "bg-ink-faint"}`} aria-hidden />
-        {t("recordUntil", { date: date(view.minExpiresAt) })}
-        {view.ignoredCount > 0 && <span className="ms-auto">{t(view.ignoredCount === 1 ? "ignored" : "ignoredMany", { n: view.ignoredCount })}</span>}
-      </p>
+    <Shell back="/app" width="xl">
+      <PageHeader
+        eyebrow={<>{t(view.rules.frequency as MsgKey)} · <span className="tabular">{inr(view.rules.amount_inr)} × {view.rules.members}</span></>}
+        title={view.rules.name}
+        meta={
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="inline-flex items-center gap-2"><span className={`inline-block size-2 rounded-full ${live ? "live-dot bg-success" : "bg-ink-faint"}`} aria-hidden />{t("recordUntil", { date: date(view.minExpiresAt) })}</span>
+            {view.ignoredCount > 0 && <span>{t(view.ignoredCount === 1 ? "ignored" : "ignoredMany", { n: view.ignoredCount })}</span>}
+          </span>
+        }
+        aside={view.rounds.length > 0 ? <ProgressRing round={cur?.round ?? view.rounds.length} total={view.rounds.length} size={72} yourTurn={cur?.collector === me} /> : undefined}
+      />
 
-      {view.members.length > 0 && (
-        <div className="mx-auto w-64">
-          <TurnRing members={ringMembers} step={(cur?.round ?? 1) - 1} marker={view.phase === "running"} showStatus={view.phase === "running"}
-            center={cur ? <><span className="text-xs text-ink-muted">{t("round", { n: cur.round })}</span><span className="tabular font-display text-xl">{inr(fixedPayout(view.rules, view.members.length))}</span></> : undefined} />
-        </div>
-      )}
-
-      {view.phase === "joining" && (
+      {view.phase === "joining" ? (
         <JoiningPanel view={view} saved={saved} isOrganiser={isOrganiser} busy={busy === "roster"}
           onLock={() => run("roster", () => lockRoster(account!, saved, view), t("saved"))} />
-      )}
-
-      {cur && (
-        <RoundCard key={cur.round} r={cur} view={view} me={me} isOrganiser={isOrganiser} busy={busy}
-          onPay={(method) => run(`pay-${method}`, () => payClaim(account!, saved, view, cur.round, method), t("saved"))}
-          onAck={(p) => run(`ack-${p.payer}`, () => ackPayment(account!, saved, view, p), t("saved"))}
-          onClose={() => run("close", () => closeRound(account!, saved, view, cur), t("saved"))}
-          onDispute={setDispute} />
-      )}
-
-      {isOrganiser && view.phase === "running" && view.rounds[0] && <WhoHasntPaid view={view} />}
-
-      {view.phase === "finished" && <Card><p className="font-display text-xl">{t("finished")} ✓</p></Card>}
-
-      {view.rounds.filter((r) => r.status === "closed").reverse().map((r) => (
-        <Card key={r.round} className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold">{t("round", { n: r.round })}</span>
-            <Pill tone={r.resultMismatch ? "bad" : "ok"}>{r.progress.confirmed}/{r.progress.total} ✓</Pill>
+      ) : (
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+          <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-24">
+            {cur ? (
+              <RoundHero key={cur.round} r={cur} view={view} me={me} busy={busy} pot={pot}
+                onPay={(method) => run(`pay-${method}`, () => payClaim(account!, saved, view, cur.round, method), t("saved"))} />
+            ) : (
+              <HeroPanel className="flex flex-col gap-4">
+                <span className={ON_ORANGE}><Seal state="confirmed" size={64} label="" /></span>
+                <p className="text-3xl font-bold tracking-[-0.03em]">{t("finished")}</p>
+              </HeroPanel>
+            )}
+            <MembersPanel view={view} me={me} />
           </div>
-          {r.result && <p>{t("roundClosed", { name: nameOf(view, r.result.body.winner), amount: inr(r.result.body.payout_inr) })}</p>}
-          {r.resultMismatch && <p className="text-sm text-danger">{t("mismatch")}</p>}
-          {r.result && <Stamp name={nameOf(view, r.result.creator)} address={r.result.creator} entityKey={r.result.key} />}
-          {r.disputes.map((d) => <DisputeLine key={d.key} d={d} view={view} />)}
-          {amISeated && r.result && (
-            <button className="self-start text-xs text-danger underline underline-offset-2" onClick={() => setDispute({ round: r.round, refKey: r.result!.key, label: t("round", { n: r.round }) })}>{t("dispute")}</button>
-          )}
-        </Card>
-      ))}
 
-      {view.phase !== "joining" && (
-        <Card className="flex flex-col gap-2">
-          <p className="font-semibold">{t("keepAlive")}</p>
-          <p className="text-sm text-ink-muted">{t("keepAliveHint")}</p>
-          <p className="text-sm">{t("recordUntil", { date: date(view.minExpiresAt) })}</p>
-          {amISeated && (
-            <Button tone="quiet" busy={busy === "keep"} onClick={() => run("keep", async () => {
-              const r = await keepAlive(account!, view)
-              toast(t("kept", { date: formatDate(blockToDate(r.target, await reader.getBlockNumber(), Date.now()), lang) }))
-            })}>{t("keepAlive")}</Button>
-          )}
-          <p className="text-xs text-ink-faint">{t("managedBy", { creator: nameOf(view, view.organiser), owner: nameOf(view, view.managedBy) })}</p>
-        </Card>
+          <div className="flex min-w-0 flex-col gap-6">
+            {cur && (
+              <PaymentsPanel r={cur} view={view} me={me} isOrganiser={isOrganiser} busy={busy}
+                onAck={(p) => run(`ack-${p.payer}`, () => ackPayment(account!, saved, view, p), t("saved"))}
+                onClose={() => run("close", () => closeRound(account!, saved, view, cur), t("saved"))}
+                onDispute={setDispute} />
+            )}
+
+            {isOrganiser && view.phase === "running" && view.rounds[0] && <WhoHasntPaid view={view} />}
+
+            {view.rounds.some((r) => r.status === "closed") && (
+              <section className="flex flex-col gap-3">
+                <SectionTitle>{t("history")}</SectionTitle>
+                <ul className="flex flex-col">
+                  {view.rounds.filter((r) => r.status === "closed").reverse().map((r) => (
+                    <li key={r.round} className="flex flex-col gap-2 border-b border-line py-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="flex items-baseline gap-3">
+                          <span className="text-sm font-semibold text-ink-muted">{String(r.round).padStart(2, "0")}</span>
+                          {r.result && <span className="font-bold">{t("roundClosed", { name: nameOf(view, r.result.body.winner), amount: inr(r.result.body.payout_inr) })}</span>}
+                        </span>
+                        <Pill tone={r.resultMismatch ? "bad" : "ok"}>{r.progress.confirmed}/{r.progress.total} ✓</Pill>
+                      </div>
+                      {r.resultMismatch && <p className="text-sm text-danger">{t("mismatch")}</p>}
+                      {r.result && <Stamp name={nameOf(view, r.result.creator)} address={r.result.creator} entityKey={r.result.key} className="ps-8" />}
+                      {r.disputes.length > 0 && <div className="flex flex-col gap-1 ps-8">{r.disputes.map((d) => <DisputeLine key={d.key} d={d} view={view} />)}</div>}
+                      {amISeated && r.result && (
+                        <button className="ms-8 self-start text-xs font-semibold text-danger underline underline-offset-2" onClick={() => setDispute({ round: r.round, refKey: r.result!.key, label: t("round", { n: r.round }) })}>{t("dispute")}</button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            <DarkPanel className="flex flex-col gap-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#f4a340]">{t("record")}</p>
+                  <p className="text-2xl font-bold tracking-[-0.03em]">{t("recordUntil", { date: date(view.minExpiresAt) })}</p>
+                </div>
+              </div>
+              <p className="text-sm text-[#b4ada5]">{t("keepAliveHint")}</p>
+              <div className="flex flex-wrap items-center gap-3">
+                {amISeated && (
+                  <button disabled={busy === "keep"} onClick={() => run("keep", async () => {
+                    const r = await keepAlive(account!, view)
+                    toast(t("kept", { date: formatDate(blockToDate(r.target, await reader.getBlockNumber(), Date.now()), lang) }))
+                  })} className="group inline-flex min-h-12 items-center gap-2 rounded-full bg-[#f2ede6] px-6 font-semibold text-[#0e0d0c] disabled:opacity-50">
+                    {busy === "keep" ? t("saving") : t("keepAlive")} <Arrow />
+                  </button>
+                )}
+                <Link href={`/verify#c=${view.circleId}&o=${view.organiser}`} className="group inline-flex min-h-12 items-center gap-2 rounded-full border border-white/25 px-6 font-semibold hover:border-white">{t("verifyLink")} <Arrow /></Link>
+              </div>
+              <p className="text-xs text-[#7d766e]">{t("managedBy", { creator: nameOf(view, view.organiser), owner: nameOf(view, view.managedBy) })}</p>
+            </DarkPanel>
+          </div>
+        </div>
       )}
-
-      <Link href={`/verify#c=${view.circleId}&o=${view.organiser}`} className="text-center text-sm text-teal-ink underline underline-offset-4">{t("verifyLink")}</Link>
 
       {dispute && (
         <DisputeSheet label={dispute.label} onClose={() => setDispute(null)} busy={busy === "dispute"}
@@ -201,38 +217,54 @@ export default function CirclePage() {
   )
 }
 
+/** Seal colours that read on the orange hero panel. */
+const ON_ORANGE = "inline-flex [--line-strong:rgb(255_255_255/.75)] [--paper-sunk:rgb(255_255_255/.16)] [--paper:#fff] [--teal:#0f3d37] [--teal-hover:#0a2a26] [--marigold:#ffd089] [--marigold-ink:#fff] [--danger:#fff]"
+
 function JoiningPanel({ view, saved, isOrganiser, busy, onLock }: { view: CircleView; saved: SavedCircle; isOrganiser: boolean; busy: boolean; onLock: () => void }) {
   const { t } = useT()
   return (
-    <>
-      <Card className="flex flex-col gap-3">
-        <p className="font-semibold">{view.seatsLeft > 0 ? `${t("waitingMembers")} · ${(view.seatsLeft === 1 ? t("seatLeft") : t("seatsLeft", { n: view.seatsLeft }))}` : t("full")}</p>
-        <ul className="flex flex-col gap-2">
-          {view.members.map((m) => (
-            <li key={m.address}>
-              <p className="font-medium">{m.name}{m.address === view.organiser && <span className="text-ink-muted"> · {t("organiser")}</span>}</p>
-              <Stamp name={m.name} address={m.address} entityKey={m.joinKey} />
-            </li>
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+      <HeroPanel className="flex flex-col gap-5">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/75">{t("waitingMembers")}</p>
+        <p className="text-4xl font-bold tracking-[-0.04em]">{view.seatsLeft > 0 ? (view.seatsLeft === 1 ? t("seatLeft") : t("seatsLeft", { n: view.seatsLeft })) : t("full")}</p>
+        <div className="flex flex-wrap gap-2">
+          {Array.from({ length: view.rules.members }, (_, i) => (
+            <span key={i} className={ON_ORANGE}><Seal state={i < view.members.length ? "confirmed" : "unpaid"} size={40} label="" /></span>
           ))}
-        </ul>
-      </Card>
-      {isOrganiser && view.seatsLeft > 0 && <ShareInvite circle={saved} name={view.rules.name} amount={view.rules.amount_inr} members={view.rules.members} />}
-      {isOrganiser && view.seatsLeft === 0 && (
-        <Card className="flex flex-col gap-2">
-          <p className="text-sm text-ink-muted">{t("lockHint")}</p>
-          <Button tone="teal" busy={busy} onClick={onLock}>{t("lockRoster")}</Button>
-        </Card>
-      )}
-    </>
+        </div>
+        {isOrganiser && view.seatsLeft === 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-white/85">{t("lockHint")}</p>
+            <Button tone="light" arrow busy={busy} onClick={onLock}>{t("lockRoster")}</Button>
+          </div>
+        )}
+      </HeroPanel>
+      <div className="flex min-w-0 flex-col gap-6">
+        <section className="flex flex-col gap-3">
+          <SectionTitle aside={<span className="text-sm text-ink-muted">{view.members.length}/{view.rules.members}</span>}>{t("members")}</SectionTitle>
+          <ul className="flex flex-col">
+            {view.members.map((m, i) => (
+              <li key={m.address} className="flex flex-col gap-1 border-b border-line py-3">
+                <p className="flex items-baseline gap-3 font-bold">
+                  <span className="text-sm font-semibold text-ink-muted">{String(i + 1).padStart(2, "0")}</span>{m.name}
+                  {m.address === view.organiser && <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#e8562a]">{t("organiser")}</span>}
+                </p>
+                <Stamp name={m.name} address={m.address} entityKey={m.joinKey} className="ps-8" />
+              </li>
+            ))}
+          </ul>
+        </section>
+        {isOrganiser && view.seatsLeft > 0 && <ShareInvite circle={saved} name={view.rules.name} amount={view.rules.amount_inr} members={view.rules.members} />}
+      </div>
+    </div>
   )
 }
 
 const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "") || "member"
 
-function RoundCard({ r, view, me, isOrganiser, busy, onPay, onAck, onClose, onDispute }: {
-  r: RoundView; view: CircleView; me?: Address; isOrganiser: boolean; busy: string | null
-  onPay: (m: "UPI" | "cash") => void; onAck: (p: Payment) => void; onClose: () => void
-  onDispute: (d: { round: number; refKey: Hex; label: string }) => void
+/** The orange panel: who collects this round, the pot, the due date, everyone's seal, and my payment. */
+function RoundHero({ r, view, me, busy, pot, onPay }: {
+  r: RoundView; view: CircleView; me?: Address; busy: string | null; pot: number; onPay: (m: "UPI" | "cash") => void
 }) {
   const { t, lang } = useT()
   const collectorName = nameOf(view, r.collector)
@@ -240,44 +272,78 @@ function RoundCard({ r, view, me, isOrganiser, busy, onPay, onAck, onClose, onDi
   const amount = view.rules.amount_inr
   // Synthetic VPA for the demo: real UPI IDs never go on Arkiv (or anywhere in this app).
   const upi = `upi://pay?pa=${slug(collectorName)}@example&pn=${encodeURIComponent(collectorName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(`${view.rules.name} R${r.round}`)}`
-  const allConfirmed = r.progress.confirmed === r.progress.total
   return (
-    <Card className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between">
-        <span className="font-semibold">{t("round", { n: r.round })} <span className="text-ink-muted">{t("of", { n: view.rounds.length })}</span></span>
-        <span className="text-xs text-ink-muted">{t("due", { date: formatDate(new Date(r.dueMs), lang, view.rules.frequency === "demo") })}</span>
+    <HeroPanel className="flex flex-col gap-6">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/75">{t("round", { n: r.round })} {t("of", { n: view.rounds.length })}</p>
+        <p className="text-xs font-semibold text-white/75">{t("due", { date: formatDate(new Date(r.dueMs), lang, view.rules.frequency === "demo") })}</p>
       </div>
-      <p className="font-display text-lg">{r.collector === me ? `${t("you")} · ` : ""}{t("collects", { name: collectorName })} <span className="tabular">{inr(fixedPayout(view.rules, view.members.length))}</span></p>
-
-      {mine && mine.state === "unpaid" && (
-        <div className="flex flex-col gap-2 rounded-2xl bg-marigold-soft p-3">
-          <a href={upi}><Button className="w-full">{t("payNow", { amount: inr(amount) })} · {t("payUpi")}</Button></a>
-          <div className="grid grid-cols-2 gap-2">
-            <Button tone="teal" busy={busy === "pay-UPI"} onClick={() => onPay("UPI")}>{t("iPaid")}</Button>
-            <Button tone="quiet" busy={busy === "pay-cash"} onClick={() => onPay("cash")}>{t("payCash")}</Button>
-          </div>
-        </div>
-      )}
-
-      {/* The seal strip: one Two-half Seal per payer, readable at a glance. */}
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2" aria-label={t("round", { n: r.round })}>
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-semibold text-white/80">{r.collector === me ? t("you") : t("collectorNow")}</p>
+        <p className="text-[clamp(1.9rem,5vw,2.6rem)] font-bold leading-none tracking-[-0.04em]">{collectorName}</p>
+        <p className="tabular text-[clamp(2.4rem,7vw,3.4rem)] font-bold leading-none tracking-[-0.05em]">{inr(pot)}</p>
+      </div>
+      <ul className="flex flex-wrap gap-4" aria-label={t("payments")}>
         {r.payments.map((p) => (
-          <li key={p.payer} className="flex min-w-0 flex-col items-center gap-1 text-center">
-            <Seal state={p.state} size={52} label={`${nameOf(view, p.payer)}: ${p.state}`} />
-            <span className="w-full truncate text-xs font-medium">{p.payer === me ? t("you") : nameOf(view, p.payer)}</span>
+          <li key={p.payer} className="flex w-16 flex-col items-center gap-1.5 text-center">
+            <span className={ON_ORANGE}><Seal state={p.state} size={48} label={`${nameOf(view, p.payer)}: ${p.state}`} /></span>
+            <span className="w-full truncate text-xs font-semibold text-white/90">{p.payer === me ? t("you") : nameOf(view, p.payer)}</span>
           </li>
         ))}
       </ul>
+      {mine && mine.state === "unpaid" && (
+        <div className="flex flex-col gap-2 rounded-[1.2rem] bg-black/15 p-3">
+          <a href={upi} className="group inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-6 font-semibold text-[#e8562a]">{t("payNow", { amount: inr(amount) })} · {t("payUpi")} <Arrow /></a>
+          <div className="grid grid-cols-2 gap-2">
+            <Button tone="teal" busy={busy === "pay-UPI"} onClick={() => onPay("UPI")}>{t("iPaid")}</Button>
+            <button disabled={busy === "pay-cash"} onClick={() => onPay("cash")} className="min-h-12 rounded-full border border-white/60 px-4 font-semibold text-white hover:border-white disabled:opacity-50">{t("payCash")}</button>
+          </div>
+        </div>
+      )}
+    </HeroPanel>
+  )
+}
 
+/** Turn order: who collected, who collects now, who is next. */
+function MembersPanel({ view, me }: { view: CircleView; me?: Address }) {
+  const { t } = useT()
+  return (
+    <section className="flex flex-col gap-3">
+      <SectionTitle aside={<span className="text-sm text-ink-muted">{view.members.length}</span>}>{t("members")}</SectionTitle>
+      <ol className="flex flex-col">
+        {view.rounds.map((r) => (
+          <li key={r.round} className="flex items-center gap-3 border-b border-line py-3">
+            <span className="w-6 text-sm font-semibold text-ink-muted">{String(r.round).padStart(2, "0")}</span>
+            <span className="min-w-0 flex-1 truncate font-bold">{r.collector === me ? `${nameOf(view, r.collector)} (${t("you")})` : nameOf(view, r.collector)}</span>
+            {r.status === "closed" ? <Pill tone="ok">{inr(r.result?.body.payout_inr ?? 0)} ✓</Pill>
+              : r.status === "open" ? <Pill tone="wait">{t("collectorNow")}</Pill>
+              : <span className="text-xs font-semibold text-ink-muted">{t("round", { n: r.round })}</span>}
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
+/** Each payer's line with signatures and actions, plus the organiser's close button. */
+function PaymentsPanel({ r, view, me, isOrganiser, busy, onAck, onClose, onDispute }: {
+  r: RoundView; view: CircleView; me?: Address; isOrganiser: boolean; busy: string | null
+  onAck: (p: Payment) => void; onClose: () => void; onDispute: (d: { round: number; refKey: Hex; label: string }) => void
+}) {
+  const { t } = useT()
+  const allConfirmed = r.progress.confirmed === r.progress.total
+  return (
+    <section className="flex flex-col gap-3">
+      <SectionTitle aside={<span className="tabular text-sm text-ink-muted">{r.progress.confirmed}/{r.progress.total} ✓</span>}>{t("payments")}</SectionTitle>
       <ul className="flex flex-col divide-y divide-line">
         {r.payments.map((p) => (
           <PaymentRow key={p.payer} p={p} r={r} view={view} me={me} busy={busy} onAck={onAck} onDispute={onDispute} />
         ))}
-      </ul>      {isOrganiser && <CloseRound r={r} view={view} busy={busy === "close"} allConfirmed={allConfirmed} onClose={onClose} />}
-    </Card>
+      </ul>
+      {isOrganiser && <CloseRound r={r} view={view} busy={busy === "close"} allConfirmed={allConfirmed} onClose={onClose} />}
+    </section>
   )
 }
-
 function DisputeLine({ d, view }: { d: AnyRec & { type: "dispute" }; view: CircleView }) {
   const { t } = useT()
   return (
@@ -307,23 +373,22 @@ function WhoHasntPaid({ view }: { view: CircleView }) {
   }, [view.circleId, closed.size, order.length, claims])
   if (!res) return null
   return (
-    <Card className="flex flex-col gap-2">
-      <p className="font-semibold">{t("whoHasntPaid")}</p>
-      {res.late.length === 0 ? <p className="text-sm text-ink-muted">{t("allPaid")}</p> : (
-        <ul className="text-sm">
+    <section className="flex flex-col gap-3">
+      <SectionTitle aside={<span className="tabular text-sm text-ink-muted">{res.late.length}</span>}>{t("whoHasntPaid")}</SectionTitle>
+      {res.late.length === 0 ? <p className="py-2 text-sm text-ink-muted">{t("allPaid")}</p> : (
+        <ul className="flex flex-col">
           {res.late.map((l) => (
-            <li key={`${l.round}-${l.member}`} className="flex justify-between py-1">
-              <span>{nameOf(view, l.member)} → {nameOf(view, l.collector)}</span>
-              <span className="text-warning">{t("round", { n: l.round })} · {t("late")} ({formatDate(new Date(l.dueMs), lang, view.rules.frequency === "demo")})</span>
+            <li key={`${l.round}-${l.member}`} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-line py-3 text-sm">
+              <span className="font-semibold">{nameOf(view, l.member)} <span className="font-normal text-ink-muted">→ {nameOf(view, l.collector)}</span></span>
+              <span className="text-xs font-semibold text-warning">{t("round", { n: l.round })} · {t("late")} · {formatDate(new Date(l.dueMs), lang, view.rules.frequency === "demo")}</span>
             </li>
           ))}
         </ul>
       )}
-      {res.query && <details className="text-xs text-ink-muted"><summary>Arkiv query</summary><code className="block break-all pt-1">{res.query}</code></details>}
-    </Card>
+      {res.query && <details className="text-xs text-ink-muted"><summary className="cursor-pointer font-semibold">Arkiv query</summary><code className="mt-2 block break-all rounded-xl bg-paper-sunk p-3">{res.query}</code></details>}
+    </section>
   )
 }
-
 /**
  * One payer's line: seal + status, signatures (collapsed), and actions. "Received" is a two-step
  * confirmation that names the person and amount and disarms after 8 s or when the data changes,
