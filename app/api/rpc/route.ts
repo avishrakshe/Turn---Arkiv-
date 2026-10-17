@@ -38,8 +38,15 @@ export async function POST(req: Request) {
   let body: unknown
   try { body = JSON.parse(text) } catch { return Response.json({ error: "bad_json" }, { status: 400 }) }
   const calls = Array.isArray(body) ? body : [body]
-  if (calls.length === 0 || calls.length > 20 || !calls.every((c) => typeof c === "object" && c !== null && ALLOWED.has((c as { method?: string }).method ?? ""))) {
-    return Response.json({ error: "method_not_allowed" }, { status: 403 })
+  if (calls.length === 0 || calls.length > 20 || !calls.every((c) => typeof c === "object" && c !== null)) {
+    return Response.json({ error: "bad_request" }, { status: 400 })
+  }
+  // A method outside the allowlist gets the standard JSON-RPC "method not found" (as a node would),
+  // so clients fall back cleanly (e.g. viem tries eth_fillTransaction, then fills locally).
+  const refused = (c: { id?: unknown }) => ({ jsonrpc: "2.0", id: c.id ?? null, error: { code: -32601, message: "method not available via Turn relay" } })
+  if (!Array.isArray(body) && !ALLOWED.has((body as { method?: string }).method ?? "")) return Response.json(refused(body as { id?: unknown }))
+  if (Array.isArray(body) && !calls.every((c) => ALLOWED.has((c as { method?: string }).method ?? ""))) {
+    return Response.json(calls.map((c) => refused(c as { id?: unknown })))
   }
   const upstream = await fetch(process.env.ARKIV_RPC_URL || RPC_HTTP, {
     method: "POST", headers: { "content-type": "application/json", "X-API-KEY": key }, body: text, cache: "no-store", redirect: "error",
