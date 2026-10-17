@@ -11,7 +11,7 @@ import {
   ENTITY_EVENTS_ABI, EntityMutationError, ExpirationTime,
   type CreateEntityParameters, type Expiry, type PublicArkivClient, type WalletArkivClient,
 } from "@arkiv-network/sdk"
-import { bool, bytes32, key as keyAttr, str, u64 } from "@arkiv-network/sdk/attr"
+import { addr, bool, bytes32, key as keyAttr, str, u64 } from "@arkiv-network/sdk/attr"
 import { eq } from "@arkiv-network/sdk/query"
 import { decodeEventLog, type Hash } from "viem"
 import { EMPTY_CONTENT_TYPE, isLeaseType, PROJECT, type EntityType } from "./config"
@@ -61,7 +61,7 @@ export async function buildCreate(intent: Intent, by: Address, circleKey: Crypto
   const needsRound = ROUND_TYPES.includes(intent.type)
   if (needsRound !== (intent.round !== undefined)) throw new Error(`round required exactly for round records (${intent.type})`)
   if ((intent.type === "pay_claim" || intent.type === "pay_ack") !== (intent.dueAt !== undefined)) throw new Error(`due_at required exactly for payment records (${intent.type})`)
-  const attributes: Record<string, ReturnType<typeof str> | ReturnType<typeof u64> | ReturnType<typeof keyAttr> | ReturnType<typeof bytes32> | ReturnType<typeof bool>> = {
+  const attributes: Record<string, ReturnType<typeof str> | ReturnType<typeof u64> | ReturnType<typeof keyAttr> | ReturnType<typeof bytes32> | ReturnType<typeof bool> | ReturnType<typeof addr>> = {
     project: str(PROJECT),
     entity_type: str(intent.type),
     circle_id: str(intent.circleId),
@@ -74,6 +74,12 @@ export async function buildCreate(intent: Intent, by: Address, circleKey: Crypto
   if (intent.commit) attributes.commit = bytes32(intent.commit)
   if (intent.onTime !== undefined) attributes.on_time = bool(intent.onTime)
   if (intent.isFinal !== undefined) attributes.is_final = bool(intent.isFinal)
+  if (intent.type === "roster") {
+    // Public turn order (addresses only), so anyone can verify payments without the circle key.
+    const { members } = intent.body as BodyOf["roster"]
+    attributes.member_count = u64(members.length)
+    members.forEach((m, i) => { attributes[`m${i + 1}`] = addr(m) })
+  }
 
   const flags = { readonly: intent.type !== "invite", permissionlessExtension: isLeaseType(intent.type) }
   if (intent.type === "bid_commit") {

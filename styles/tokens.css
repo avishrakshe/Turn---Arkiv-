@@ -1,0 +1,138 @@
+/*
+ * Turn design tokens (reused from the pre-existing Turn site; marigold/teal set to #F4A340/#1F5E55).
+ * Light is the default. Dark applies from the OS preference unless the user picked light,
+ * or when the user explicitly picked dark. The two dark blocks must stay identical:
+ * scripts/contrast.mjs checks every text/background pair in both themes.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces: warm paper, never pure white */
+  --paper: #fbf6ee;
+  --paper-raised: #fffcf6;
+  --paper-sunk: #f3ebdf;
+  --line: #e4d8c6;
+  --line-strong: #cdbca4;
+
+  /* Text: warm ink, never pure black */
+  --ink: #2b211a;
+  --ink-muted: #66574b;
+  --ink-faint: #8a7a6c; /* decorative / large text only */
+
+  /* Marigold: the "your turn" colour and primary CTA fill */
+  --marigold: #f4a340;
+  --marigold-hover: #e8922b;
+  --marigold-soft: #fbe8c2;
+  --marigold-ink: #87540a; /* marigold as text on paper */
+  --on-marigold: #2b1a05;
+
+  /* Teal: trust, money, stability */
+  --teal: #1f5e55;
+  --teal-hover: #184b44;
+  --teal-soft: #dbece7;
+  --teal-ink: #1f5e55;
+  --on-teal: #fbf6ee;
+
+  /* Semantic */
+  --success: #187045;
+  --success-soft: #dcefe3;
+  --warning: #92560a;
+  --warning-soft: #f8e7cb;
+  --danger: #b0322a;
+  --danger-soft: #f7dcd8;
+
+  --focus: #1f5e55;
+  --glow: rgb(238 167 34 / 0.45);
+  --shadow-color: 32 22 12;
+
+  /* Avatar fills (text is always --ink on these) */
+  --av-1: #f3c98b;
+  --av-2: #b9dccf;
+  --av-3: #f0b8a4;
+  --av-4: #cfc4ea;
+  --av-5: #c6dd9f;
+  --av-6: #a9cde6;
+  --av-7: #ecc2d6;
+  --av-8: #e5d3a8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #1b1612;
+    --paper-raised: #251e18;
+    --paper-sunk: #14100d;
+    --line: #3a3028;
+    --line-strong: #54473b;
+    --ink: #f4ebdf;
+    --ink-muted: #bdae9e;
+    --ink-faint: #8f8071;
+    --marigold: #f2b441;
+    --marigold-hover: #f6c261;
+    --marigold-soft: #3d2c12;
+    --marigold-ink: #f4be5a;
+    --on-marigold: #24170a;
+    --teal: #5fc4b4;
+    --teal-hover: #7dd3c5;
+    --teal-soft: #173430;
+    --teal-ink: #6fcbbc;
+    --on-teal: #10201d;
+    --success: #6acf96;
+    --success-soft: #16301f;
+    --warning: #f2b75e;
+    --warning-soft: #37280f;
+    --danger: #f39088;
+    --danger-soft: #3c1b18;
+    --focus: #7dd3c5;
+    --glow: rgb(242 180 65 / 0.5);
+    --shadow-color: 0 0 0;
+    --av-1: #f3c98b;
+    --av-2: #b9dccf;
+    --av-3: #f0b8a4;
+    --av-4: #cfc4ea;
+    --av-5: #c6dd9f;
+    --av-6: #a9cde6;
+    --av-7: #ecc2d6;
+    --av-8: #e5d3a8;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #1b1612;
+  --paper-raised: #251e18;
+  --paper-sunk: #14100d;
+  --line: #3a3028;
+  --line-strong: #54473b;
+  --ink: #f4ebdf;
+  --ink-muted: #bdae9e;
+  --ink-faint: #8f8071;
+  --marigold: #f2b441;
+  --marigold-hover: #f6c261;
+  --marigold-soft: #3d2c12;
+  --marigold-ink: #f4be5a;
+  --on-marigold: #24170a;
+  --teal: #5fc4b4;
+  --teal-hover: #7dd3c5;
+  --teal-soft: #173430;
+  --teal-ink: #6fcbbc;
+  --on-teal: #10201d;
+  --success: #6acf96;
+  --success-soft: #16301f;
+  --warning: #f2b75e;
+  --warning-soft: #37280f;
+  --danger: #f39088;
+  --danger-soft: #3c1b18;
+  --focus: #7dd3c5;
+  --glow: rgb(242 180 65 / 0.5);
+  --shadow-color: 0 0 0;
+  --av-1: #f3c98b;
+  --av-2: #b9dccf;
+  --av-3: #f0b8a4;
+  --av-4: #cfc4ea;
+  --av-5: #c6dd9f;
+  --av-6: #a9cde6;
+  --av-7: #ecc2d6;
+  --av-8: #e5d3a8;
+}

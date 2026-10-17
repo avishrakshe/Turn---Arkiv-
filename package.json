@@ -9,23 +9,25 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -p tsconfig.json --noEmit && vite build",
-    "preview": "vite preview",
+    "dev": "next dev",
+    "build": "next build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "probe": "tsx scripts/probe-network.ts",
     "smoke": "tsx scripts/smoke-write.ts",
-    "seed": "tsx scripts/seed-demo.ts"
+    "seed": "tsx scripts/seed-demo.ts",
+    "start": "next start"
   },
   "dependencies": {
     "@arkiv-network/sdk": "0.8.1",
     "@category-labs/mera": "0.2.0",
+    "@tailwindcss/postcss": "4.3.3",
     "arkiv-encryption": "0.1.0",
     "next": "16.3.8",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "tailwindcss": "4.3.3",
     "viem": "2.57.7"
   },
   "devDependencies": {

@@ -116,6 +116,11 @@ export async function decodeRecord(raw: RawEntity, ctx: DecodeContext): Promise<
     body = parseEnvelope(plain, { v: 1, t: type, c: ctx.circleId, by: creator, ...(needsRound ? { r: round } : {}) })
     if (!body) return reject("binding_mismatch")
     if (type === "pay_ack" && (body as BodyOf["pay_ack"]).ref !== refKey) return reject("binding_mismatch")
+    if (type === "roster") {
+      const pub = publicRoster(a)
+      const members = (body as BodyOf["roster"]).members
+      if (!pub || pub.length !== members.length || pub.some((m, i) => m !== members[i])) return reject("binding_mismatch")
+    }
   }
 
   const rec = {
@@ -128,6 +133,19 @@ export async function decodeRecord(raw: RawEntity, ctx: DecodeContext): Promise<
     ...(isFinal !== undefined && { isFinal }),
   } as AnyRec
   return { ok: true, rec }
+}
+
+/** The roster's public turn order from its attributes (m1…mN), or undefined if malformed. */
+export function publicRoster(a: Attributes): Address[] | undefined {
+  const n = u64Attr(a.member_count)
+  if (n === undefined || n < 1 || n > 30) return undefined
+  const out: Address[] = []
+  for (let i = 1; i <= n; i++) {
+    const v = a[`m${i}`]
+    if (v?.type !== "addr") return undefined
+    out.push(v.value.toLowerCase() as Address)
+  }
+  return out
 }
 
 /**

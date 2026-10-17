@@ -8,3 +8,6 @@ dist/
 coverage/
 # local-only seed state (contains synthetic member keys for the demo circle; never commit)
 .seed/
+.next/
+next-env.d.ts
+*.tsbuildinfo

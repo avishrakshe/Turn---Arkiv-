@@ -1,0 +1,59 @@
+.marker {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transition:
+    transform var(--duration-ring) var(--ease-spring),
+    opacity var(--duration-base) var(--ease-out);
+}
+
+.halo {
+  filter: drop-shadow(0 0 10px var(--glow));
+}
+
+.trail {
+  opacity: 0.55;
+}
+
+.seat {
+  transition: transform var(--duration-slow) var(--ease-spring);
+}
+
+.seatActive {
+  transform: scale(1.08);
+  transition-delay: calc(var(--duration-ring) * 0.35);
+}
+
+/* The pot: leaves the centre, arcs out to the winner's seat, and fades as it lands. */
+.coin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: coin-flow 900ms var(--ease-out) 250ms both;
+}
+
+@keyframes coin-flow {
+  0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  15% { transform: translate(0, 0) scale(1.15); opacity: 1; }
+  80% { transform: translate(var(--tx), var(--ty)) scale(0.9); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0.3); opacity: 0; }
+}
+
+/* Loader: six seats, a warm light passing from one to the next. */
+.loaderSeat {
+  fill: var(--line-strong);
+  animation: seat-pass 1.2s ease-in-out infinite;
+}
+
+@keyframes seat-pass {
+  0%, 100% { fill: var(--line-strong); transform: scale(1); }
+  12% { fill: var(--marigold); transform: scale(1.35); }
+  30% { fill: var(--line-strong); transform: scale(1); }
+}
+
+.loaderSeat { transform-box: fill-box; transform-origin: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .marker, .seat, .seatActive { transition: none; }
+  .coin { display: none; }
+  .loaderSeat { animation: none; }
+  .loaderSeat:first-child { fill: var(--marigold); }
+}

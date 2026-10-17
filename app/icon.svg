@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .t { fill: #1f5e55 } .r { stroke: #1f5e55 } .bg { fill: #fbf6ee }
+    @media (prefers-color-scheme: dark) { .t { fill: #5fc4b4 } .r { stroke: #5fc4b4 } .bg { fill: #1b1612 } }
+  </style>
+  <rect class="bg" width="32" height="32" rx="8"/>
+  <circle class="r" cx="16" cy="16" r="10" fill="none" stroke-width="1.6" opacity=".35"/>
+  <circle class="t" cx="16" cy="6" r="2.5"/>
+  <circle cx="24.66" cy="11" r="4.4" fill="#f4a340" stroke="#fbf6ee" stroke-width="1.2"/>
+  <circle class="t" cx="24.66" cy="21" r="2.5"/>
+  <circle class="t" cx="16" cy="26" r="2.5"/>
+  <circle class="t" cx="7.34" cy="21" r="2.5"/>
+  <circle class="t" cx="7.34" cy="11" r="2.5"/>
+</svg>
