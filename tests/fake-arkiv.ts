@@ -36,6 +36,12 @@ export class FakeArkiv {
 
   async getBlockNumber(_?: unknown) { return this.head }
 
+  async getEntity(key: Hex) {
+    const e = this.entities.find((x) => x.key.toLowerCase() === key.toLowerCase())
+    if (!e) throw new Error("not found")
+    return e
+  }
+
   /** Typed as the slice of the SDK public client that loadCircle/fetchAll use. */
   get reader(): Parameters<typeof loadCircle>[0] {
     return this as unknown as Parameters<typeof loadCircle>[0]
@@ -67,11 +73,17 @@ function evaluate(ex: Expression, e: RawEntity): boolean {
     case "or": return ex.expressions.some((x) => evaluate(x, e))
     case "not": return !evaluate(ex.expression, e)
     case "comparison": {
-      if (ex.operator !== "=") throw new Error("fake supports = only")
       if (ex.name === "$creator") return e.creator.toLowerCase() === String(ex.value.value).toLowerCase()
       if (ex.name === "$key") return e.key.toLowerCase() === String(ex.value.value).toLowerCase()
       const a = e.attributes[ex.name]
-      return !!a && a.type === ex.value.type && String(a.value).toLowerCase() === String(ex.value.value).toLowerCase()
+      if (!a || a.type !== ex.value.type) return false
+      if (ex.operator === "=") return String(a.value).toLowerCase() === String(ex.value.value).toLowerCase()
+      const x = BigInt(a.value as bigint), y = BigInt(ex.value.value as bigint)
+      if (ex.operator === "<=") return x <= y
+      if (ex.operator === ">=") return x >= y
+      if (ex.operator === "<") return x < y
+      if (ex.operator === ">") return x > y
+      throw new Error(`fake: unsupported operator ${ex.operator}`)
     }
     default: throw new Error(`fake: unsupported ${ex.kind}`)
   }
