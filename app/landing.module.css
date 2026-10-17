@@ -141,13 +141,12 @@
 
 /* ── Sections ────────────────────────────────────── */
 .section { max-width: 72rem; margin: 0 auto; padding: clamp(3rem, 8vw, 5.5rem) clamp(1rem, 4vw, 2.5rem); display: flex; flex-direction: column; gap: 1.25rem; }
+/* Full-bleed night band; the inner .section keeps the normal width. */
 .dark {
-  max-width: none;
   background: linear-gradient(180deg, #14100d, #1b1612);
   color: #f4ebdf;
   --line-strong: #54473b; --paper-sunk: #241b15;
 }
-.dark > * { width: 100%; max-width: 72rem; margin-inline: auto; }
 .eyebrow { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--marigold-ink); }
 .dark .eyebrow { color: #f4be5a; }
 .h2 { font-size: clamp(1.8rem, 4.5vw, 2.8rem); max-width: 40rem; }

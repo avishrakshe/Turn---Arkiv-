@@ -145,7 +145,7 @@ export default function Landing() {
       </section>
 
       {/* ───────────── Why it can't be rewritten ───────────── */}
-      <section id="why" className={`${s.section} ${s.dark}`}>
+      <section id="why" className={s.dark}><div className={s.section}>
         <p className={s.eyebrow}>Why it can&apos;t be rewritten</p>
         <h2 className={s.h2}>The record belongs to the group, not to us.</h2>
         <div className={s.cards2}>
@@ -166,7 +166,7 @@ export default function Landing() {
             <p className={s.cardTextDark}>If this website vanished tomorrow, the ledger would still be on Arkiv. Our <Link href="/verify" className="underline">verify page</Link> and a one-line query read it straight from the network.</p>
           </article>
         </div>
-      </section>
+      </div></section>
 
       {/* ───────────── Privacy ───────────── */}
       <section className={s.section}>
@@ -190,11 +190,11 @@ export default function Landing() {
             </ul>
           </div>
           <div className={s.tableCol}>
-            <p className={s.tableHead}>Never stored anywhere</p>
+            <p className={s.tableHead}>Never on the network</p>
             <ul className={s.list}>
               <li>Your money: it stays on UPI or cash</li>
               <li>Phone numbers, UPI IDs</li>
-              <li>The group key (it lives in the invite link)</li>
+              <li>The group key (only in the invite link and on members&apos; phones)</li>
             </ul>
           </div>
         </div>
