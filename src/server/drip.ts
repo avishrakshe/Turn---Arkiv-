@@ -26,14 +26,14 @@ export type DripResult =
   | { status: "uncertain"; txHash?: Hash; reason: string }
 
 export function parseDripConfig(env: Record<string, string | undefined>): DripConfig {
-  const key = env.DRIP_PRIVATE_KEY
+  const key = env.DRIP_PRIVATE_KEY?.trim()
   if (!key || !/^0x[0-9a-fA-F]{64}$/.test(key)) throw new Error("DRIP_PRIVATE_KEY missing or malformed")
   return {
     privateKey: key as `0x${string}`,
-    amountGlm: env.DRIP_AMOUNT_GLM ?? "0.02",
-    maxRecipientBalanceGlm: env.DRIP_MAX_RECIPIENT_BALANCE_GLM ?? "0.005",
+    amountGlm: env.DRIP_AMOUNT_GLM?.trim() || "0.02",
+    maxRecipientBalanceGlm: env.DRIP_MAX_RECIPIENT_BALANCE_GLM?.trim() || "0.005",
     rpcUrl: env.ARKIV_RPC_URL || undefined,
-    apiKey: env.ARKIV_API_KEY || undefined,
+    apiKey: env.ARKIV_API_KEY?.trim() || undefined,
   }
 }
 

@@ -23,7 +23,7 @@ const PER_IP = 240
 const hits = new Map<string, number[]>()
 
 export async function POST(req: Request) {
-  const key = process.env.ARKIV_API_KEY
+  const key = process.env.ARKIV_API_KEY?.trim()
   if (!key) return Response.json({ error: "rpc_proxy_not_configured" }, { status: 503 })
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
   const now = Date.now()

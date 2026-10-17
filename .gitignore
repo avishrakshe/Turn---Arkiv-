@@ -12,3 +12,5 @@ coverage/
 next-env.d.ts
 *.tsbuildinfo
 .debug/
+.vercel
+.env*
