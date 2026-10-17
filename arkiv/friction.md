@@ -20,8 +20,13 @@ anonymous RPC `https://rpc.tiramisu.db-chain.testnet.arkiv.network`.
 - **Why it matters:** the SDK has no public create estimator, and this message is identical to the one
   the write-safety guidance says can follow a *lost send response*. A new developer can't tell
   "you have no GLM" from "your transaction may or may not have been sent".
-- **Workaround:** check `getBalance` before any estimate and show "fund this address" first.
-  Re-test with a funded account pending (see Phase 1 report).
+- **Workaround:** check `getBalance` before any estimate and show "fund this address" first
+  ([`writer.ts`](../src/arkiv/writer.ts) throws `NeedsGasError`; the app then calls the drip).
+- **Re-test 2026-10-17:** once the account held GLM, the same kind of create (and 8 others) succeeded,
+  at 110,088–134,184 gas each ([evidence](../docs/evidence.md)). So the opaque error above really was
+  "no balance". The message is still the only signal.
+- **Suggested fix:** have the node or SDK map a zero-balance estimate failure to an
+  `InsufficientFunds`-style error before the generic `EntityMutationError`.
 
 ## 2. No documented pattern for sharing one encryption key with a group
 
@@ -81,3 +86,41 @@ anonymous RPC `https://rpc.tiramisu.db-chain.testnet.arkiv.network`.
 - **Suggested fix:** SDK: detect HTTP 429 / `ANON_COST_LIMITED` and throw a typed error without
   sleeping on `Retry-After` by default; docs: state the anonymous budget and a cost table per select
   field (does `payload: true` dominate cost?).
+
+## 5. Explorer shows an absolute expiry block as a relative duration
+
+- **Surface:** Block Explorer (`tiramisu.explorer.arkiv.network`), entity page. Observed 2026-10-17.
+- **Steps:** open entity
+  [`0x3c2533eb…4360`](https://tiramisu.explorer.arkiv.network/entity/0x3c2533eb95707ffbb53c4ab246b8a2cf14ab00ffc360b5855a25ffcd67d04360)
+  (a `pay_ack` from our seed). It was created with `ExpirationTime.atBlock(circleExpiresAt, { atLeast: fromDays(1) })`,
+  then extended by another member with `executeBatch({ extensions: [{ expires: ExpirationTime.atBlock(11055830n) }] })`.
+- **Observed:** Overview says **"EXPIRES 11055830 blocks (~255d 22h) from block 687853"**. The history
+  shows the CREATE row with "Expires 43200 blocks" and the EXTEND row with "11055830 blocks".
+- **Actual state (SDK `getEntity`, head 691557):** `expiresAt = 11055830n`, an **absolute** block
+  number, ≈ **240 days** from head. The explorer reads the absolute deadline as a block count added
+  to the last-activity block, overstating the remaining life by ~16 days. On CREATE it shows the
+  `atLeast` floor (43,200 blocks = 1 day), not the effective deadline the engine applied,
+  `max(absolute, inclusion + floor)`.
+- **Expected:** "Expires at block 11,055,830 (~240 d from now)", and for operations the effective deadline.
+- **Why it matters:** "Keep our record alive" is a headline feature for us. A member checking on the
+  explorer sees the wrong date, and on CREATE a record looks like it dies in 1 day.
+- **Suggested fix:** display `expiresAt` from entity state as an absolute block with a relative
+  estimate from the current head; for operations, show the resolved deadline from the
+  `EntityCreated`/`ExpiryExtended` event's `expiresAt`.
+
+---
+
+# Paths we tested that worked (same rigour)
+
+| Surface | What we tested (version) | Expected | Actual | Evidence |
+|---|---|---|---|---|
+| SDK `createEntity` | Smoke: 7 creates of 5 types; seed: 21 creates + 1 batched, 8 types. Encrypted payloads (284 B = 256-byte bucket + 28), up to 12 attributes incl. `u64`, `key`, `bool`, `addr` (0.8.1) | Confirmed with `entityKey` | All confirmed, 110k–134k gas each (smoke) | [evidence §1](../docs/evidence.md), [addresses](addresses.md) |
+| SDK `executeBatch` | 1 create + 15 extensions (organiser); 21 extensions by a **non-owner** (`permissionlessExtension`) | Atomic, keys returned | Both confirmed; `extendedEntities` complete; 7 extensions cost 70,000 gas total | seed tx `0xb35e91ba…`, `0xe98c2c73…` |
+| `permissionlessExtension` + `readonly` | Member C extends 7 records owned by the organiser | Allowed; owner/creator unchanged | Allowed; `owner` and `creator` unchanged after | evidence §1 |
+| WebSocket `watchEntityEvents`, no `fromBlock` | Listen during a 7-extension batch | 7 `ExpiryExtended` | 7/7 received (push, no polling) | evidence §1 |
+| Query builder | Compound `eq` + `lte`/`gte` on `u64` + `or($creator…)`, `.atBlock()`, `limit`, `next()` | Typed range filters work | Correct results; ranges on `due_at`/`round` | `tests/flow.test.ts`; live app |
+| Raw JSON-RPC `arkiv_query` | Same strings as the SDK renders, via plain HTTP POST (README `curl`) | Same rows as SDK | 22 rows, identical to the SDK read-back | README "Read the ledger without Turn" |
+| Public RPC CORS | Browser `fetch` from `https://turn-arkiv.vercel.app` | Allowed | `access-control-allow-origin: *`; also exposes `RateLimit`, `Retry-After`, `Arkiv-Cost` | `/verify` |
+| Native GLM transfer | EOA → EOA via viem `sendTransaction` | Works on a no-EVM chain | 21,000 gas, confirmed | evidence §2 |
+| `arkiv-encryption` 0.1.0 | Encrypt/decrypt round trip, wrong key, tampered byte | Fail closed | Round trip OK; both failures throw | `tests/payload.test.ts` |
+| Faucet + Hub | Fund a dev EOA; create an access key | Works | 10 GLM received; key used as `X-API-KEY` | — |

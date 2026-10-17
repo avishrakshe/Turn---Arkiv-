@@ -120,7 +120,7 @@ WebSocket entity events for live updates; atomic batches.
 | Atomic `executeBatch` | Round result + renewal land together | No half-closed rounds | [writer.ts `runBatch`](../src/arkiv/writer.ts) |
 | `watchEntityEvents` over WebSocket, no `fromBlock` | Toast "Priya just paid ✓", screen updates without refresh | No polling loop | [live.ts](../lib/live.ts) |
 | Encrypted payloads (`arkiv-encryption`) + size buckets | Explorer shows no names or amounts | Privacy of members | [payload.ts](../src/arkiv/payload.ts) |
-| `$owner` vs `$creator` | "Created by X · Managed by Y" | Ownership is display only | [view.ts](../src/core/view.ts) |
+| `$owner` vs `$creator` | "Created by X · Managed by Y" on the committee screen | We show `$owner` but never trust it; every trust decision uses `$creator`. (We don't ship an ownership-transfer button: a new manager couldn't publish organiser records, since trust follows the creator.) | [view.ts](../src/core/view.ts), [circle.ts](../src/arkiv/circle.ts) |
 
 ### 5. Friction report
 <https://github.com/avishrakshe/Turn---Arkiv-/blob/main/arkiv/friction.md>
