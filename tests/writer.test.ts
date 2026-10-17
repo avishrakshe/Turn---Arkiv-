@@ -20,7 +20,7 @@ function createdLog(entityKey: Hex) {
 }
 
 async function intent() {
-  return { type: "pay_claim" as const, circleId: newOpId(), round: 1, body: { amount_inr: 5000, method: "UPI" as const, note: "" }, expires: ExpirationTime.fromDays(30) }
+  return { type: "pay_claim" as const, circleId: newOpId(), round: 1, dueAt: Date.UTC(2026, 9, 22), body: { amount_inr: 5000, method: "UPI" as const, note: "" }, expires: ExpirationTime.fromDays(30) }
 }
 
 // biome-ignore lint: test double
@@ -117,7 +117,7 @@ describe("ArkivWriter", () => {
     const flat = JSON.stringify(params.attributes, (_k, v) => (typeof v === "bigint" ? v.toString() : v))
     expect(flat).not.toContain("7777")
     expect(flat).not.toContain("meera")
-    expect(params.flags).toEqual({ readonly: true, permissionlessExtension: false })
+    expect(params.flags).toEqual({ readonly: true, permissionlessExtension: true })
     expect(Object.keys(params.attributes ?? {}).every((n) => /^[a-z][a-z0-9_]*$/.test(n))).toBe(true)
   })
 })

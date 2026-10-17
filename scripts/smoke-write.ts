@@ -9,13 +9,14 @@
  */
 import { formatEther, type Hex } from "viem"
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
-import { publicClient, walletClient } from "../src/arkiv/client"
+import { eventsClient, publicClient, walletClient } from "../src/arkiv/client"
 import { loadCircle } from "../src/arkiv/circle"
 import { CHAIN, explorerEntityUrl, explorerTxUrl } from "../src/arkiv/config"
 import { importCircleKey, newCircleKeyHex } from "../src/arkiv/payload"
-import { ArkivWriter, expiry, newOpId, type Intent, type WriteOutcome } from "../src/arkiv/writer"
+import { ArkivWriter, expiry, newOpId, runBatch, type Intent, type WriteOutcome } from "../src/arkiv/writer"
+import { extensionsTo, keepAliveTargetBlock } from "../src/core/lease"
 import { paymentFor } from "../src/core/payments"
-import { periodMs } from "../src/core/schedule"
+import { roundDueMs } from "../src/core/schedule"
 import type { Address, CircleBody } from "../src/core/bodies"
 import { drip, parseDripConfig } from "../src/server/drip"
 
@@ -55,7 +56,7 @@ async function main() {
     start_ms: Date.now(), due_days: 0, max_discount_bps: 0, reveal_window_ms: 0, organiser_first: false,
   }
   console.log(`circle_id ${circleId}`)
-  const circle = await must(org, { type: "circle", circleId, body, expires: expiry.circle(3, periodMs(body)) }, key)
+  const circle = await must(org, { type: "circle", circleId, body, expires: expiry.circle(body) }, key)
   const circleEntity = await reader.getEntity(circle.entityKey)
   const asCircle = expiry.asCircle(circleEntity.expiresAt)
   console.log(`  circle expires at block ${circleEntity.expiresAt}`)
@@ -81,8 +82,8 @@ async function main() {
   await must(org, { type: "roster", circleId, body: { members: joins.map((j) => j.creator), member_keys: joins.map((j) => j.key) }, expires: asCircle }, key)
 
   const b = members[0]!.w
-  const claim = await must(b, { type: "pay_claim", circleId, round: 1, body: { amount_inr: 1000, method: "UPI", note: "smoke" }, expires: asCircle }, key)
-  await must(org, { type: "pay_ack", circleId, round: 1, refKey: claim.entityKey, onTime: true, body: { ref: claim.entityKey, status: "received" }, expires: asCircle }, key)
+  const claim = await must(b, { type: "pay_claim", circleId, round: 1, dueAt: roundDueMs(body, 1), body: { amount_inr: 1000, method: "UPI", note: "smoke" }, expires: asCircle }, key)
+  await must(org, { type: "pay_ack", circleId, round: 1, dueAt: roundDueMs(body, 1), refKey: claim.entityKey, onTime: true, body: { ref: claim.entityKey, status: "received" }, expires: asCircle }, key)
 
   snap = await loadCircle(reader, { circleId, organiser: org.address }, key)
   const p = paymentFor(snap.records, 1, b.address, org.address, 1000, snap.roster?.body.members)
@@ -90,6 +91,27 @@ async function main() {
   console.log(`payment round 1 by member B → ${p.state.toUpperCase()} (claim ${p.claim?.key.slice(0, 10)}…, ack ${p.ack?.key.slice(0, 10)}…)`)
   if (p.state !== "confirmed") throw new Error("smoke failed: payment not confirmed")
   if (j0.entityKey !== snap.roster?.body.member_keys[0]) console.log("  note: organiser join not first in roster order")
+
+  // Lifetime Extension by a MEMBER (not the owner): permissionlessExtension on every lease record,
+  // one atomic batch, observed live over the WebSocket watcher (no fromBlock → push, not polling).
+  const head = await reader.getBlockNumber({ cacheTime: 0 })
+  const latest = snap.records.reduce((m, r) => (r.expiresAt > m ? r.expiresAt : m), 0n)
+  const target = keepAliveTargetBlock(head, latest)
+  const toExtend = extensionsTo(snap.records.filter((r) => r.type !== "invite"), target)
+  const seen: string[] = []
+  const ws = eventsClient()
+  const unwatch = ws.watchEntityEvents({ onExpiryExtended: (e) => { seen.push(e.entityKey.toLowerCase()) }, onError: (e) => console.log("  watch error:", e.message) })
+  await new Promise((r) => setTimeout(r, 1_500))
+  const m2 = members[1]!
+  const memberWallet = walletClient(privateKeyToAccount(m2.pk))
+  const ext = await runBatch(memberWallet, reader, { extend: { keys: toExtend.map((r) => r.key), toBlock: target } })
+  console.log(`\nkeep-alive by member C: ${ext.status} ${"txHash" in ext && ext.txHash ? explorerTxUrl(ext.txHash) : ""} extended=${ext.status === "confirmed" ? ext.extended.length : 0}/${toExtend.length} → block ${target}`)
+  if (ext.status === "confirmed") gasLog.push({ type: `batch_extend_x${ext.extended.length}`, gasUsed: (await reader.getTransactionReceipt({ hash: ext.txHash })).gasUsed })
+  for (let i = 0; i < 20 && seen.length < toExtend.length; i++) await new Promise((r) => setTimeout(r, 500))
+  unwatch()
+  console.log(`watchEntityEvents (WebSocket) saw ${seen.filter((k) => toExtend.some((r) => r.key === k)).length}/${toExtend.length} ExpiryExtended events`)
+  const after1 = await reader.getEntity(circle.entityKey)
+  console.log(`circle expiresAt ${circleEntity.expiresAt} → ${after1.expiresAt}; owner ${after1.owner} creator ${after1.creator}`)
 
   const byType = new Map<string, bigint[]>()
   for (const g of gasLog) byType.set(g.type, [...(byType.get(g.type) ?? []), g.gasUsed])

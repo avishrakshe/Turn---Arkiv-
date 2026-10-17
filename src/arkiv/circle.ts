@@ -12,6 +12,7 @@ import { str } from "@arkiv-network/sdk/attr"
 import { eq } from "@arkiv-network/sdk/query"
 import { ORGANISER_TYPES, PROJECT, type EntityType } from "./config"
 import { fetchAll } from "./reader"
+import { roundDueMs } from "../core/schedule"
 import { byChainOrder, decodeRecord, dedupeByOp, type AnyRec, type Decoded, type RawEntity, type Rec, type RejectReason } from "./records"
 import type { Address, Hex } from "../core/bodies"
 
@@ -27,7 +28,9 @@ export type Snapshot = {
   roster?: Rec<"roster">
   /** Trusted, de-duplicated records in chain order (all types). */
   records: AnyRec[]
-  rejected: { key: Hex; reason: RejectReason | "invalid_roster" }[]
+  rejected: { key: Hex; reason: RejectReason | "invalid_roster" | "bad_due_at" }[]
+  /** Records in this circle_id from wallets outside the roster: never decrypted, only counted. */
+  ignored: { key: Hex; creator: Address }[]
 }
 
 type Reader = Pick<PublicArkivClient, "select" | "getBlockNumber">
@@ -66,14 +69,30 @@ export async function loadCircle(client: Reader, ref: CircleRef, key: CryptoKey)
   const roster = pickRoster(orgRecs.filter(isType("roster")), firstJoin, organiser, circle, rejected)
 
   let records: AnyRec[]
+  let ignored: Snapshot["ignored"] = []
   if (roster) {
     const others = roster.body.members.filter((m) => m !== organiser)
     const memberRaw = await fetchAll(client, base, { creators: others, atBlock: block })
     const rosterSet = new Set(roster.body.members)
     const memberRecs = await decodeAll(memberRaw.entities, (t, c) => rosterSet.has(c) && !ORGANISER_TYPES.includes(t))
     records = dedupeByOp([...orgRecs, ...memberRecs])
+    // What the creator scope leaves out (keys + creators only; nothing is decrypted).
+    const all = await fetchAll(client, base, { atBlock: block, light: true })
+    const trustedSet = new Set<string>([organiser, ...roster.body.members])
+    ignored = all.entities.filter((e) => !trustedSet.has(e.creator.toLowerCase()))
+      .map((e) => ({ key: e.key.toLowerCase() as Hex, creator: e.creator.toLowerCase() as Address }))
   } else {
     records = dedupeByOp([...orgRecs, ...joinRecs])
+  }
+
+  // due_at is public and queryable, so it must match the rules everyone agreed to.
+  if (circle) {
+    records = records.filter((r) => {
+      if ((r.type !== "pay_claim" && r.type !== "pay_ack") || r.round === undefined) return true
+      const ok = r.dueAt === roundDueMs(circle.body, r.round)
+      if (!ok) rejected.push({ key: r.key, reason: "bad_due_at" })
+      return ok
+    })
   }
 
   const joins = roster
@@ -83,7 +102,7 @@ export async function loadCircle(client: Reader, ref: CircleRef, key: CryptoKey)
   return {
     block, ref: { circleId: ref.circleId, organiser }, ...(circle && { circle }),
     invites: records.filter(isType("invite")),
-    joins, ...(roster && { roster }), records, rejected,
+    joins, ...(roster && { roster }), records, rejected, ignored,
   }
 }
 

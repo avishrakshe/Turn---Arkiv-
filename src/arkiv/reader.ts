@@ -10,9 +10,11 @@ import type { Address } from "../core/bodies"
 type Reader = Pick<PublicArkivClient, "select" | "getBlockNumber">
 
 export const SELECT = {
-  key: true, creator: true, createdAt: true, expiresAt: true, creationFlags: true,
+  key: true, owner: true, creator: true, createdAt: true, expiresAt: true, creationFlags: true,
   contentType: true, payload: true, attributes: true,
 } as const
+
+export const LIGHT = { key: true, creator: true, attributes: true } as const
 
 export type ReadOptions = {
   /** Creator scope. An empty list means nobody is trusted → no query, no results. */
@@ -20,6 +22,8 @@ export type ReadOptions = {
   atBlock?: bigint
   maxPages?: number
   pageSize?: number
+  /** Only key, creator and attributes (no payload): for counting what a scope leaves out. */
+  light?: boolean
 }
 
 export function creatorScope(creators: readonly Address[]): Expression {
@@ -37,7 +41,7 @@ export async function fetchAll(client: Reader, predicates: Expression[], opts: R
     const block = opts.atBlock ?? (await client.getBlockNumber({ cacheTime: 0 }))
     try {
       if (++requests > maxPages) throw new Error("page budget exhausted")
-      let page = await client.select(SELECT).where(where).atBlock(block).limit(pageSize).fetch()
+      let page = await client.select((opts.light ? LIGHT : SELECT) as typeof SELECT).where(where).atBlock(block).limit(pageSize).fetch()
       if (page.blockNumber !== block) throw new Error("snapshot mismatch")
       const entities: RawEntity[] = [...page.entities]
       while (page.hasNextPage()) {

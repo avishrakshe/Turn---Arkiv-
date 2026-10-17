@@ -1,7 +1,7 @@
 import { tiramisu } from "@arkiv-network/sdk/chains"
 
 /** Namespace on every Turn entity. Not authentication — trust comes from creator checks. */
-export const PROJECT = "turn_v1"
+export const PROJECT = "turn_arkiv_v1"
 
 export const CHAIN = tiramisu
 export const RPC_HTTP = tiramisu.rpcUrls.default.http[0]
@@ -34,6 +34,14 @@ export const isEntityType = (v: unknown): v is EntityType =>
 
 /** Created by the organiser only (trusted by the invite's organiser address, not the roster). */
 export const ORGANISER_TYPES: readonly EntityType[] = ["circle", "invite", "roster", "bid_close", "round_result"]
+
+/**
+ * Records that live as long as the circle. Created `readonly` + `permissionlessExtension`, so any
+ * member (not only the organiser) can renew the lease. `invite` dies after 48 h and `bid_commit`
+ * after its reveal window; neither is part of the lease.
+ */
+export const LEASE_TYPES: readonly EntityType[] = ENTITY_TYPES.filter((t) => t !== "invite" && t !== "bid_commit")
+export const isLeaseType = (t: EntityType) => LEASE_TYPES.includes(t)
 
 /** `bid_commit` carries no payload; every other record is AES-GCM ciphertext. */
 export const EMPTY_CONTENT_TYPE = "application/octet-stream"

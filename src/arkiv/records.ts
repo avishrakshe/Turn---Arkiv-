@@ -6,7 +6,7 @@
  * never decrypted.
  */
 import type { Attributes } from "@arkiv-network/sdk"
-import { EMPTY_CONTENT_TYPE, isEntityType, PROJECT, type EntityType } from "./config"
+import { EMPTY_CONTENT_TYPE, isEntityType, isLeaseType, PROJECT, type EntityType } from "./config"
 import { ENCRYPTED_CONTENT_TYPE, open } from "./payload"
 import { parseEnvelope, ROUND_TYPES, type Address, type BodyOf, type Hex } from "../core/bodies"
 
@@ -27,6 +27,8 @@ export type Rec<K extends EntityType = EntityType> = {
   key: Hex
   type: K
   creator: Address
+  /** Current owner (mutable; only for display — trust uses `creator`). */
+  owner: Address
   /** Chain block the entity was created in — the only ordering Turn trusts. */
   block: bigint
   expiresAt: bigint
@@ -34,6 +36,8 @@ export type Rec<K extends EntityType = EntityType> = {
   createdAtMs: number
   opId: string
   round?: number
+  /** Round due time (ms), checked against the circle rules by the loader. */
+  dueAt?: number
   refKey?: Hex
   commit?: Hex
   onTime?: boolean
@@ -43,7 +47,7 @@ export type Rec<K extends EntityType = EntityType> = {
 export type AnyRec = { [K in EntityType]: Rec<K> }[EntityType]
 
 export type RejectReason =
-  | "wrong_project" | "wrong_circle" | "unknown_type" | "untrusted_creator" | "mutable" | "extensible"
+  | "wrong_project" | "wrong_circle" | "unknown_type" | "untrusted_creator" | "flags"
   | "content_type" | "bad_attributes" | "decrypt_failed" | "binding_mismatch"
 
 export type Decoded = { ok: true; rec: AnyRec } | { ok: false; key: Hex; reason: RejectReason }
@@ -74,12 +78,15 @@ export async function decodeRecord(raw: RawEntity, ctx: DecodeContext): Promise<
   if (!isEntityType(type)) return reject("unknown_type")
   const creator = raw.creator.toLowerCase() as Address
   if (!ctx.trusted(type, creator)) return reject("untrusted_creator")
-  if (type !== "invite" && !raw.creationFlags.readonly) return reject("mutable")
-  if (raw.creationFlags.permissionlessExtension) return reject("extensible")
+  // Flags are fixed at creation. Every record except the invite is readonly, and exactly the lease
+  // types are extensible by anyone, so no member can publish a record the circle can't keep alive.
+  if (raw.creationFlags.readonly !== (type !== "invite")) return reject("flags")
+  if (raw.creationFlags.permissionlessExtension !== isLeaseType(type)) return reject("flags")
 
   const createdAtMs = u64Attr(a.created_at)
   const opId = strAttr(a.op_id)
   const round = u64Attr(a.round)
+  const dueAt = u64Attr(a.due_at)
   const refKey = keyAttr(a.ref_key)
   const commit = b32Attr(a.commit)
   const onTime = boolAttr(a.on_time)
@@ -89,6 +96,7 @@ export async function decodeRecord(raw: RawEntity, ctx: DecodeContext): Promise<
   if (needsRound ? round === undefined || round < 1 : round !== undefined) return reject("bad_attributes")
   if ((type === "pay_ack" || type === "bid_reveal" || type === "dispute") && !refKey) return reject("bad_attributes")
   if (type === "pay_ack" && onTime === undefined) return reject("bad_attributes")
+  if ((type === "pay_claim" || type === "pay_ack") !== (dueAt !== undefined)) return reject("bad_attributes")
   if (type === "bid_commit" && !commit) return reject("bad_attributes")
   if (type === "round_result" && isFinal === undefined) return reject("bad_attributes")
 
@@ -111,8 +119,9 @@ export async function decodeRecord(raw: RawEntity, ctx: DecodeContext): Promise<
   }
 
   const rec = {
-    key, type, creator, block: raw.createdAt, expiresAt: raw.expiresAt, createdAtMs, opId, body,
+    key, type, creator, owner: (raw.owner ?? raw.creator).toLowerCase() as Address, block: raw.createdAt, expiresAt: raw.expiresAt, createdAtMs, opId, body,
     ...(round !== undefined && { round }),
+    ...(dueAt !== undefined && { dueAt }),
     ...(refKey && { refKey }),
     ...(commit && { commit }),
     ...(onTime !== undefined && { onTime }),

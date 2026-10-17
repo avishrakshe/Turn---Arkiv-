@@ -1,4 +1,4 @@
-﻿import { str, u64 } from "@arkiv-network/sdk/attr"
+import { str, u64 } from "@arkiv-network/sdk/attr"
 import { describe, expect, it } from "vitest"
 import { decodeRecord } from "../src/arkiv/records"
 import { importCircleKey, newCircleKeyHex } from "../src/arkiv/payload"
@@ -64,12 +64,13 @@ describe("decodeRecord trust gate", () => {
     expect(await decodeRecord(relabelled, { circleId: s.circleId, key: s.key, trusted: () => true })).toMatchObject({ ok: false, reason: "binding_mismatch" })
   })
 
-  it("rejects mutable or publicly-extensible records", async () => {
+  it("rejects mutable records and lease records others can't extend", async () => {
     const s = await setup()
     const e = await s.write(s.people[1]!, "pay_claim", claim, { round: 1 })
     const ctx = { circleId: s.circleId, key: s.key, trusted: () => true }
-    expect(await decodeRecord({ ...e, creationFlags: { readonly: false, permissionlessExtension: false } }, ctx)).toMatchObject({ reason: "mutable" })
-    expect(await decodeRecord({ ...e, creationFlags: { readonly: true, permissionlessExtension: true } }, ctx)).toMatchObject({ reason: "extensible" })
+    expect(await decodeRecord({ ...e, creationFlags: { readonly: false, permissionlessExtension: true } }, ctx)).toMatchObject({ reason: "flags" })
+    // A lease record that nobody else could extend would let its creator run out the clock on it.
+    expect(await decodeRecord({ ...e, creationFlags: { readonly: true, permissionlessExtension: false } }, ctx)).toMatchObject({ reason: "flags" })
   })
 
   it("rejects wrong content type and other projects", async () => {

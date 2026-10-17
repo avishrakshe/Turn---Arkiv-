@@ -14,9 +14,10 @@ import {
 import { bool, bytes32, key as keyAttr, str, u64 } from "@arkiv-network/sdk/attr"
 import { eq } from "@arkiv-network/sdk/query"
 import { decodeEventLog, type Hash } from "viem"
-import { EMPTY_CONTENT_TYPE, PROJECT, type EntityType } from "./config"
+import { EMPTY_CONTENT_TYPE, isLeaseType, PROJECT, type EntityType } from "./config"
 import { ENCRYPTED_CONTENT_TYPE, seal } from "./payload"
-import { makeEnvelope, ROUND_TYPES, validateBody, type Address, type BodyOf, type Hex } from "../core/bodies"
+import { makeEnvelope, ROUND_TYPES, validateBody, type Address, type BodyOf, type CircleBody, type Hex } from "../core/bodies"
+import { bidCommitLifetimeBlocks, circleLifetimeBlocks } from "../core/lease"
 
 const ARKIV_ADDRESS = "0x4400000000000000000000000000000000000044"
 
@@ -26,6 +27,8 @@ export type Intent<K extends EntityType = EntityType> = {
   body: BodyOf[K]
   expires: Expiry
   round?: number
+  /** Round due time in ms (pay_claim / pay_ack), from the circle rules. */
+  dueAt?: number
   refKey?: Hex
   commit?: Hex
   onTime?: boolean
@@ -57,6 +60,7 @@ export const newOpId = (): string => {
 export async function buildCreate(intent: Intent, by: Address, circleKey: CryptoKey | null, opId: string): Promise<CreateEntityParameters> {
   const needsRound = ROUND_TYPES.includes(intent.type)
   if (needsRound !== (intent.round !== undefined)) throw new Error(`round required exactly for round records (${intent.type})`)
+  if ((intent.type === "pay_claim" || intent.type === "pay_ack") !== (intent.dueAt !== undefined)) throw new Error(`due_at required exactly for payment records (${intent.type})`)
   const attributes: Record<string, ReturnType<typeof str> | ReturnType<typeof u64> | ReturnType<typeof keyAttr> | ReturnType<typeof bytes32> | ReturnType<typeof bool>> = {
     project: str(PROJECT),
     entity_type: str(intent.type),
@@ -65,12 +69,13 @@ export async function buildCreate(intent: Intent, by: Address, circleKey: Crypto
     op_id: str(opId),
   }
   if (intent.round !== undefined) attributes.round = u64(intent.round)
+  if (intent.dueAt !== undefined) attributes.due_at = u64(intent.dueAt)
   if (intent.refKey) attributes.ref_key = keyAttr(intent.refKey)
   if (intent.commit) attributes.commit = bytes32(intent.commit)
   if (intent.onTime !== undefined) attributes.on_time = bool(intent.onTime)
   if (intent.isFinal !== undefined) attributes.is_final = bool(intent.isFinal)
 
-  const flags = { readonly: intent.type !== "invite", permissionlessExtension: false }
+  const flags = { readonly: intent.type !== "invite", permissionlessExtension: isLeaseType(intent.type) }
   if (intent.type === "bid_commit") {
     return { payload: new Uint8Array(), contentType: EMPTY_CONTENT_TYPE, attributes, expires: intent.expires, flags }
   }
@@ -162,14 +167,56 @@ export class ArkivWriter {
   }
 }
 
-/** Expiration helpers (see arkiv/schema.md "Expiration"). */
+/** Expiration per type (see src/core/lease.ts and arkiv/schema.md "Entity Expiration"). */
 export const expiry = {
-  circle: (members: number, periodMs: number): Expiry =>
-    ExpirationTime.fromDays(Math.ceil((members * periodMs) / 86_400_000) + 90),
-  /** Dies with the circle — never before. */
+  circle: (c: Pick<CircleBody, "start_ms" | "members" | "frequency">, nowMs = Date.now()): Expiry =>
+    ExpirationTime.fromBlocks(Number(circleLifetimeBlocks(c, nowMs))),
+  /** Dies with the circle (its current lease) — never before. */
   asCircle: (circleExpiresAt: bigint): Expiry => ExpirationTime.atBlock(circleExpiresAt, { atLeast: ExpirationTime.fromDays(1) }),
   invite: (): Expiry => ExpirationTime.fromHours(48),
-  /** Until the estimated end of the reveal window plus a day; at least two days. */
-  bidCommit: (msUntilRevealEnd: number): Expiry =>
-    ExpirationTime.fromDays(Math.max(2, Math.ceil(Math.max(0, msUntilRevealEnd) / 86_400_000) + 1)),
+  bidCommit: (msUntilRevealEnd: number): Expiry => ExpirationTime.fromBlocks(Number(bidCommitLifetimeBlocks(msUntilRevealEnd))),
+}
+
+export type BatchOutcome =
+  | { status: "confirmed"; txHash: Hash; created: Hex[]; extended: Hex[]; block: bigint }
+  | { status: "failed"; reason: string; txHash?: Hash }
+  | { status: "unconfirmed"; reason: string; txHash?: Hash }
+
+type BatchWallet = Pick<WalletArkivClient, "executeBatch">
+
+/**
+ * One atomic transaction: optional creates (e.g. a round_result) + lease extensions to one absolute
+ * block. Anyone may extend lease records (permissionlessExtension), so a member can run this
+ * without the organiser. Never resent automatically; an unknown outcome is reconciled by receipt.
+ */
+export async function runBatch(
+  wallet: BatchWallet, reader: Pick<PublicArkivClient, "getTransactionReceipt">,
+  op: { creates?: CreateEntityParameters[]; extend?: { keys: readonly Hex[]; toBlock: bigint } },
+): Promise<BatchOutcome> {
+  const extensions = (op.extend?.keys ?? []).map((entityKey) => ({ entityKey, expires: ExpirationTime.atBlock(op.extend!.toBlock) }))
+  if (!op.creates?.length && extensions.length === 0) return { status: "failed", reason: "empty" }
+  try {
+    const r = await wallet.executeBatch({ ...(op.creates?.length && { creates: op.creates }), ...(extensions.length && { extensions }) })
+    const receipt = await reader.getTransactionReceipt({ hash: r.txHash }).catch(() => undefined)
+    return { status: "confirmed", txHash: r.txHash, created: r.createdEntities.map((k) => k.toLowerCase() as Hex),
+      extended: r.extendedEntities.map((k) => k.toLowerCase() as Hex), block: receipt?.blockNumber ?? 0n }
+  } catch (error) {
+    if (!(error instanceof EntityMutationError)) return { status: "failed", reason: error instanceof Error ? error.name : "error" }
+    const txHash = error.txHash
+    if (!txHash) return { status: "unconfirmed", reason: "no_hash" }
+    for (let i = 0; i < 5; i++) {
+      const receipt = await reader.getTransactionReceipt({ hash: txHash }).catch(() => undefined)
+      if (receipt?.status === "reverted") return { status: "failed", reason: "reverted", txHash }
+      if (receipt?.status === "success") {
+        const events = receipt.logs
+          .filter((l) => l.address.toLowerCase() === ARKIV_ADDRESS)
+          .map((l) => { try { return decodeEventLog({ abi: ENTITY_EVENTS_ABI, data: l.data, topics: l.topics }) } catch { return undefined } })
+        const created = events.flatMap((e) => (e?.eventName === "EntityCreated" ? [e.args.entityKey.toLowerCase() as Hex] : []))
+        const extended = events.flatMap((e) => (e?.eventName === "ExpiryExtended" ? [e.args.entityKey.toLowerCase() as Hex] : []))
+        return { status: "confirmed", txHash, created, extended, block: receipt.blockNumber }
+      }
+      await new Promise((r) => setTimeout(r, 3_000))
+    }
+    return { status: "unconfirmed", reason: "receipt_pending", txHash }
+  }
 }
