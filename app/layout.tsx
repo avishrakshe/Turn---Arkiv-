@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { Providers } from "@/components/providers"
-import { dmSans, fraunces } from "@/lib/fonts"
+import { bebas, urbanist } from "@/lib/fonts"
+import { InstallPrompt } from "@/components/install"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -16,16 +17,17 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fbf6ee" },
+    { media: "(prefers-color-scheme: light)", color: "#f2ede6" },
     { media: "(prefers-color-scheme: dark)", color: "#1b1612" },
   ],
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${fraunces.variable} ${dmSans.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${urbanist.variable} ${bebas.variable}`}>
       <body>
         <Providers>{children}</Providers>
+        <InstallPrompt />
       </body>
     </html>
   )

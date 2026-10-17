@@ -4,7 +4,6 @@ import type { ButtonHTMLAttributes, ReactNode } from "react"
 import { cn } from "@/lib/cn"
 import { useT } from "@/lib/i18n"
 import { EXPLORER } from "@/src/arkiv/config"
-import { TurnMark } from "./ring/TurnMark"
 import { RingLoader } from "./ring/RingLoader"
 
 export function Shell({ children, back }: { children: ReactNode; back?: string }) {
@@ -17,8 +16,7 @@ export function Shell({ children, back }: { children: ReactNode; back?: string }
             <Link href={back} className="-ms-2 rounded-full px-2 py-1 text-sm text-ink-muted hover:text-ink" aria-label={t("back")}>←</Link>
           )}
           <Link href="/app" className="inline-flex items-center gap-2" aria-label="Turn">
-            <TurnMark size={28} />
-            <span lang="en" className="font-display text-[1.35rem] leading-none font-semibold tracking-tight">Turn</span>
+            <span lang="en" className="text-[1.6rem] leading-none font-extrabold tracking-[-0.04em]">Turn</span>
           </Link>
         </div>
         <div className="flex items-center gap-1">
@@ -39,9 +37,9 @@ export function Button({ tone = "primary", busy, className, children, disabled, 
   return (
     <button {...rest} disabled={disabled || busy}
       className={cn(
-        "inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-5 text-base font-semibold transition-colors disabled:opacity-55",
-        tone === "primary" && "bg-marigold text-on-marigold hover:bg-marigold-hover",
-        tone === "teal" && "bg-teal text-on-teal hover:bg-teal-hover",
+        "inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-5 text-base font-semibold transition-[background-color,transform] hover:-translate-y-px active:translate-y-0 disabled:opacity-55 disabled:hover:translate-y-0",
+        tone === "primary" && "bg-[#e8562a] text-white hover:bg-[#f06a1f]",
+        tone === "teal" && "bg-ink text-paper hover:bg-ink/85",
         tone === "quiet" && "border border-line bg-paper-raised text-ink hover:border-line-strong",
         tone === "danger" && "border border-danger/40 bg-danger-soft text-danger",
         className,

@@ -4,18 +4,20 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
     name: "Turn: savings committees",
+    shortcuts: [{ name: "Start a committee", url: "/create" }, { name: "Verify a record", url: "/verify" }],
     short_name: "Turn",
     description: "Your committee's shared record, kept by every member.",
     start_url: "/app?source=pwa",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#fbf6ee",
-    theme_color: "#fbf6ee",
+    background_color: "#0e0d0c",
+    theme_color: "#0e0d0c",
     categories: ["finance", "lifestyle"],
     icons: [
-      { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
-      { src: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+      { src: "/icons/192", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icons/512", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icons/maskable", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   }
 }

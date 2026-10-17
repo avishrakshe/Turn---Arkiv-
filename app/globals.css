@@ -28,8 +28,9 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
 
-  --font-display: var(--font-fraunces), "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --font-sans: var(--font-dm-sans), "Noto Sans Devanagari", "Nirmala UI", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-display: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-urbanist), "Noto Sans Devanagari", "Nirmala UI", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-condensed: var(--font-bebas), "Arial Narrow", sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
 
   --radius-card: 1.25rem;
@@ -55,11 +56,10 @@
   }
   h1, h2, h3 {
     font-family: var(--font-display);
-    font-weight: 500;
-    letter-spacing: -0.015em;
-    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.08;
     text-wrap: balance;
-    font-variation-settings: "SOFT" 60, "WONK" 0;
   }
   :is(h1, h2, h3):lang(hi) { font-family: var(--font-sans); letter-spacing: normal; line-height: 1.35; }
   p { text-wrap: pretty; }
@@ -75,3 +75,5 @@
 .toast { animation: toast-in var(--duration-slow) var(--ease-out) both; }
 @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 .live-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+@keyframes install-in { from { opacity: 0; transform: translateY(24px) scale(0.97); } }

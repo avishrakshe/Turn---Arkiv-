@@ -9,16 +9,16 @@
   color-scheme: light;
 
   /* Surfaces: warm paper, never pure white */
-  --paper: #fbf6ee;
-  --paper-raised: #fffcf6;
-  --paper-sunk: #f3ebdf;
-  --line: #e4d8c6;
-  --line-strong: #cdbca4;
+  --paper: #f2ede6;
+  --paper-raised: #faf8f4;
+  --paper-sunk: #e9e2d8;
+  --line: #ddd4c7;
+  --line-strong: #bfb3a3;
 
   /* Text: warm ink, never pure black */
-  --ink: #2b211a;
-  --ink-muted: #66574b;
-  --ink-faint: #8a7a6c; /* decorative / large text only */
+  --ink: #0e0d0c;
+  --ink-muted: #5d5650;
+  --ink-faint: #8b847c; /* decorative / large text only */
 
   /* Marigold: the "your turn" colour and primary CTA fill */
   --marigold: #f4a340;
@@ -60,8 +60,8 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --paper: #1b1612;
-    --paper-raised: #251e18;
+    --paper: #0b0b0b;
+    --paper-raised: #171513;
     --paper-sunk: #14100d;
     --line: #3a3028;
     --line-strong: #54473b;
@@ -100,8 +100,8 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --paper: #1b1612;
-  --paper-raised: #251e18;
+  --paper: #0b0b0b;
+  --paper-raised: #171513;
   --paper-sunk: #14100d;
   --line: #3a3028;
   --line-strong: #54473b;
