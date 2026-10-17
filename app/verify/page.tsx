@@ -25,11 +25,14 @@ export default function Verify() {
   const [names, setNames] = useState<Map<string, string>>(new Map())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [limited, setLimited] = useState(false)
+  const [relay, setRelay] = useState(false)
 
-  async function run(id: string, org: string, k: string | null) {
-    setBusy(true); setLedger(undefined); setNames(new Map()); setError(null)
+  async function run(id: string, org: string, k: string | null, viaRelay = relay) {
+    setBusy(true); setLedger(undefined); setNames(new Map()); setError(null); setLimited(false)
     try {
-      const client = publicClient()
+      // Default: straight to the public Tiramisu RPC. The relay is opt-in, only offered after a 429.
+      const client = publicClient(viaRelay ? { rpcUrl: "/api/rpc" } : {})
       const hint = /^0x[0-9a-f]{40}$/.test(org) ? (org as Address) : undefined
       const l = await readPublicLedger(client, id, hint)
       setLedger(l ?? null)
@@ -39,8 +42,9 @@ export default function Verify() {
         if (v) setNames(new Map(v.members.map((m) => [m.address, m.name])))
       }
     } catch (e) {
+      setLimited(isRateLimited(e))
       setError(isRateLimited(e)
-        ? "The public Tiramisu RPC refused this read: its free anonymous budget for your connection is used up (HTTP 429). Wait a few minutes and try again — this page deliberately has no Turn server to fall back on."
+        ? "The public Tiramisu RPC refused this read: its free anonymous budget for your connection is used up (HTTP 429). Wait a few minutes and try again: this page talks to Arkiv only, by design."
         : "Couldn't reach the Tiramisu RPC. Check your connection and try again.")
     } finally { setBusy(false) }
   }
@@ -71,7 +75,16 @@ export default function Verify() {
       </Card>
 
       {busy && <Loading text={t("loading")} />}
-      {error && <Card><p className="text-sm">{error}</p></Card>}
+      {error && (
+        <Card className="flex flex-col gap-2">
+          <p className="text-sm">{error}</p>
+          {limited && !relay && (
+            <Button tone="quiet" onClick={() => { setRelay(true); run(circleId, organiser, keyHex, true) }}>Read through Turn&apos;s relay instead</Button>
+          )}
+          {limited && !relay && <p className="text-xs text-ink-muted">The relay is Turn&apos;s server forwarding the same queries with Turn&apos;s Arkiv access key. Results are computed here in your browser either way; only the transport changes.</p>}
+        </Card>
+      )}
+      {relay && ledger && <p className="text-xs text-warning">Read through Turn&apos;s relay (/api/rpc). Reload the page to read directly from Arkiv again.</p>}
       {ledger === null && !busy && !error && <Card><p>No committee with this id on Tiramisu.</p></Card>}
       {ledger && (
         <>
