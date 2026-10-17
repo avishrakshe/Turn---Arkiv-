@@ -159,7 +159,7 @@
   grid-template-columns: 3rem 1fr; padding: 2.5rem 0; border-bottom: 1.5px solid var(--ink0);
 }
 .row:first-child { border-top: 1.5px solid var(--ink0); }
-@media (min-width: 900px) { .row { grid-template-columns: 1fr 2fr auto; align-items: center; } }
+@media (min-width: 900px) { .row { grid-template-columns: 1fr 2fr 12rem; align-items: center; } }
 .rowNum { font-size: 1.1rem; font-weight: 600; }
 .rowBody { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
 .rowKicker { color: #5d5650; font-size: 1rem; }
