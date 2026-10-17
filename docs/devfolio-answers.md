@@ -5,8 +5,8 @@ Drafts for every question in the challenge's `docs/submission-checklist.md`. Pla
 
 **Project name:** Turn on Arkiv
 **Tagline:** Save together. Take turns. A savings-committee record nobody can rewrite.
-**Tracks:** Best Indian Use Case (primary) · Security · Censorship Resistance. *(Privacy not entered;
-see decisions.md. Open Source not entered.)*
+**Tracks:** Best Indian Use Case only (decided 2026-10-17). The Security and Censorship Resistance
+answers below are kept for reference but are **not** entered.
 **Links:** repo <https://github.com/avishrakshe/Turn---Arkiv->, video `<YouTube/Drive link>`
 
 ---
@@ -51,7 +51,7 @@ alive. Anyone can read it without Turn's servers.
 <https://turn-arkiv.vercel.app> (keyless verifier: <https://turn-arkiv.vercel.app/verify>)
 
 ### 2. Does any team member hold Indian nationality? *
-`<Yes — confirm>`
+Yes.
 
 ### Why India? (Best Indian Use Case)
 **Who:** families, office colleagues and kitty groups in India who already run ₹1,000–₹10,000/month
@@ -68,7 +68,7 @@ committees over WhatsApp, often on budget Android phones. **What changes for the
 
 It works today on the live link: create a committee, share the WhatsApp invite, pay and confirm.
 
-### Why this pillar? Security
+### Why this pillar? Security *(not entered)*
 **Who is misled today:** the member whose payment is denied, and the group misled by an organiser who
 edits the notebook. **What Turn changes:** the app shows and filters records **by their on-chain
 creator, never by a field anyone can write.**
@@ -80,7 +80,7 @@ creator, never by a field anyone can write.**
 - Every record shows **"Signed by <name> · 0x12…ab · View on explorer"**.
 - Readonly + payload binding stop edits, replays from another circle, and copies between members.
 
-### Why this pillar? Censorship Resistance
+### Why this pillar? Censorship Resistance *(not entered)*
 **Who is censored today:** members whose evidence lives on the organiser's phone. The organiser can
 delete a WhatsApp message, refuse to show the notebook, or disappear. **What changes:**
 - **Anyone outside Turn can read and verify the ledger without Turn's backend.** `/verify` is a static
@@ -171,7 +171,7 @@ Make the anonymous RPC budget visible and fail-fast in the SDK: a typed `QueryEr
 ~30-minute `Retry-After`. Document the budget and per-field query cost next to the query docs.
 
 ### 15. Open to a 20-minute feedback call? *
-`<Yes/No>`
+Yes.
 
 ### 16–17. Declarations *
 Check both: built 9–18 Oct with pre-existing work disclosed; public MIT repo with accessible links.
