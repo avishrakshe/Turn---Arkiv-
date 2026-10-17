@@ -198,7 +198,7 @@ function JoiningPanel({ view, saved, isOrganiser, busy, onLock }: { view: Circle
   return (
     <>
       <Card className="flex flex-col gap-3">
-        <p className="font-semibold">{view.seatsLeft > 0 ? `${t("waitingMembers")} · ${t("seatsLeft", { n: view.seatsLeft })}` : t("full")}</p>
+        <p className="font-semibold">{view.seatsLeft > 0 ? `${t("waitingMembers")} · ${(view.seatsLeft === 1 ? t("seatLeft") : t("seatsLeft", { n: view.seatsLeft }))}` : t("full")}</p>
         <ul className="flex flex-col gap-2">
           {view.members.map((m) => (
             <li key={m.address}>

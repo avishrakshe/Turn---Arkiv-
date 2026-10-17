@@ -48,7 +48,7 @@ shared notebook nobody can rewrite:
 | `src/core/` | Pure logic: payment state machine, view model, lease/expiry maths, schedule, money |
 | `app/`, `components/`, `lib/` | Next.js PWA (screens, account, live events, i18n), `/api/drip`, `/api/rpc` |
 | `scripts/` | `smoke-write.ts`, `seed-demo.ts`, `test-drip.ts`, `probe-network.ts` |
-| `tests/` | Vitest suites (49 tests) |
+| `tests/` | Vitest suites (50 tests) |
 
 ## Run locally
 
@@ -57,7 +57,7 @@ Requirements: Node ≥ 22 (tested on 24.19).
 ```bash
 npm install
 cp .env.example .env.local      # then fill DRIP_PRIVATE_KEY (and optionally ARKIV_API_KEY)
-npm test                         # 49 unit tests, no network
+npm test                         # 50 unit tests, no network
 npm run dev                      # http://localhost:3000
 ```
 

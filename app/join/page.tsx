@@ -53,7 +53,7 @@ export default function JoinPage() {
         <p className="tabular text-lg"><strong>{inr(view.rules.amount_inr)}</strong> × {view.rules.members} · {t(view.rules.frequency as MsgKey)}</p>
         <p className="text-sm text-ink-muted">{t("potIs")}: <span className="tabular">{inr(view.rules.amount_inr * view.rules.members)}</span></p>
         <p className="text-sm">{view.members.map((m) => m.name).join(", ")}</p>
-        <p className="text-sm text-ink-muted">{full ? t("full") : t("seatsLeft", { n: view.seatsLeft })}</p>
+        <p className="text-sm text-ink-muted">{full ? t("full") : (view.seatsLeft === 1 ? t("seatLeft") : t("seatsLeft", { n: view.seatsLeft }))}</p>
         {organiser && <Stamp name={`${organiser.name} (${t("organiser")})`} address={organiser.address} entityKey={view.circleKey} />}
         {view.inviteExpiresAt && !expired && (
           <p className="text-xs text-ink-muted">{t("inviteExpires", { date: formatDate(blockToDate(view.inviteExpiresAt, head, Date.now()), lang, true) })}</p>

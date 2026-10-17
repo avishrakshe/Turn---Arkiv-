@@ -69,6 +69,20 @@ describe("who hasn't paid (compound range query)", () => {
   })
 })
 
+describe("public roster attributes", () => {
+  it("rejects a roster whose public turn order differs from its encrypted member list", async () => {
+    const { str } = await import("@arkiv-network/sdk/attr")
+    const s = await withRoster(3)
+    const roster = s.chain.entities.find((e) => e.attributes.entity_type?.value === "roster")!
+    // Swap m1 and m2 in the public attributes only.
+    const m1 = roster.attributes.m1!, m2 = roster.attributes.m2!
+    roster.attributes = { ...roster.attributes, m1: m2, m2: m1, entity_type: str("roster") }
+    const snap = await loadCircle(s.chain.reader, { circleId: s.circleId, organiser: s.organiser }, s.key)
+    expect(snap.roster).toBeUndefined()
+    expect(snap.rejected.some((r) => r.reason === "binding_mismatch")).toBe(true)
+  })
+})
+
 describe("/verify: keyless public ledger", () => {
   it("confirms payments from public attributes + $creator only", async () => {
     const { s, meera, ravi, priya, arjun } = await sharma()
