@@ -400,6 +400,7 @@ function PaymentRow({ p, r, view, me, busy, onAck, onDispute }: {
 }) {
   const { t } = useT()
   const [armed, setArmed] = useState(false)
+  const [showSig, setShowSig] = useState(false)
   const payer = nameOf(view, p.payer)
   const collectorName = nameOf(view, r.collector)
   const claimKey = p.claim?.key
@@ -422,38 +423,38 @@ function PaymentRow({ p, r, view, me, busy, onAck, onDispute }: {
           </p>
         </div>
       </div>
-      {(p.claim || p.ack) && (
-        <details className="-mt-1 ps-12 text-xs text-ink-muted">
-          <summary className="cursor-pointer select-none">{t("signatures")}</summary>
-          <div className="mt-1 flex flex-col gap-0.5">
-            {p.claim && <Stamp name={payer} address={p.claim.creator} entityKey={p.claim.key} />}
-            {p.ack && <Stamp name={collectorName} address={p.ack.creator} entityKey={p.ack.key} />}
-          </div>
-        </details>
-      )}
       {p.disputes.length > 0 && <div className="flex flex-col gap-1 ps-12">{p.disputes.map((d) => <DisputeLine key={d.key} d={d} view={view} />)}</div>}
-      {(canAck || canDispute) && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 ps-12">
-          {canAck && !armed && (
-            <Button tone="teal" className="min-h-10 px-4" onClick={() => setArmed(true)}>{t("markReceived")}</Button>
+      {canAck && armed && (
+        <div className="ms-12 flex flex-col gap-3 rounded-2xl border border-ink/15 bg-paper-raised p-4" role="group">
+          <p className="text-sm font-semibold">{t("ackQuestion", { amount: inr(p.claim!.body.amount_inr), name: payer })}</p>
+          <div className="flex gap-2">
+            <Button tone="teal" className="min-h-10 flex-1" busy={busy === `ack-${p.payer}`}
+              onClick={(e) => { if (!e.isTrusted) return; setArmed(false); onAck(p) }}>{t("ackYes")}</Button>
+            <Button tone="quiet" className="min-h-10" onClick={() => setArmed(false)}>{t("ackNo")}</Button>
+          </div>
+        </div>
+      )}
+      {(canAck || canDispute || p.claim || p.ack) && !armed && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 ps-12">
+          {canAck && <Button tone="teal" className="min-h-10 px-5" onClick={() => setArmed(true)}>{t("markReceived")}</Button>}
+          {(p.claim || p.ack) && (
+            <button type="button" aria-expanded={showSig} onClick={() => setShowSig((v) => !v)}
+              className="inline-flex min-h-10 items-center gap-1 text-xs font-semibold text-ink-muted hover:text-ink">
+              {t("signatures")} <span aria-hidden className={`transition-transform ${showSig ? "rotate-180" : ""}`}>▾</span>
+            </button>
           )}
-          {canAck && armed && (
-            <div className="flex w-full flex-col gap-2 rounded-xl border border-teal/40 bg-teal-soft p-3" role="group">
-              <p className="text-sm">{t("ackQuestion", { amount: inr(p.claim!.body.amount_inr), name: payer })}</p>
-              <div className="flex gap-2">
-                <Button tone="teal" className="min-h-10 flex-1" busy={busy === `ack-${p.payer}`}
-                  onClick={(e) => { if (!e.isTrusted) return; setArmed(false); onAck(p) }}>{t("ackYes")}</Button>
-                <Button tone="quiet" className="min-h-10" onClick={() => setArmed(false)}>{t("ackNo")}</Button>
-              </div>
-            </div>
-          )}
-          {canDispute && !armed && (
-            <button className="min-h-10 px-1 text-xs text-danger underline underline-offset-2"
+          {canDispute && (
+            <button className="min-h-10 text-xs font-semibold text-danger underline-offset-2 hover:underline"
               onClick={() => onDispute({ round: r.round, refKey: (p.ack ?? p.claim)!.key, label: `${payer} · ${t("round", { n: r.round })}` })}>{t("dispute")}</button>
           )}
         </div>
       )}
-    </li>
+      {showSig && (
+        <div className="ms-12 flex flex-col gap-1 rounded-xl bg-paper-sunk/60 p-3">
+          {p.claim && <Stamp name={payer} address={p.claim.creator} entityKey={p.claim.key} />}
+          {p.ack && <Stamp name={collectorName} address={p.ack.creator} entityKey={p.ack.key} />}
+        </div>
+      )}    </li>
   )
 }
 /** Closing a round is final. If not every seal is locked, ask first and say how many are open. */
