@@ -34,8 +34,13 @@ export default function CirclePage() {
   const [dispute, setDispute] = useState<{ round: number; refKey: Hex; label: string } | null>(null)
   const prev = useRef<Loaded | null>(null)
   const me = account?.address.toLowerCase() as Address | undefined
+  // The loader reads these through a ref so it keeps one identity: re-creating it would re-run the
+  // initial load (and spend read budget) whenever the account or language changes.
+  const ctx = useRef({ me, t, toast })
+  ctx.current = { me, t, toast }
 
   const load = useCallback(async (c: SavedCircle, announce: boolean) => {
+    const { me, t, toast } = ctx.current
     const { view, head, snap } = await snapshot(c)
     if (!view) return
     const next: Loaded = { view, head, records: snap.records, at: Date.now() }
@@ -57,7 +62,7 @@ export default function CirclePage() {
     }
     prev.current = next
     setData(next)
-  }, [me, t, toast])
+  }, [])
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("id") ?? ""
@@ -312,7 +317,9 @@ function WhoHasntPaid({ view }: { view: CircleView }) {
       if (!off) setRes({ ...r, query: due.length ? overdueQueryText(view.circleId, now, [due[0]!, due.at(-1)!]) : "" })
     }).catch(() => undefined)
     return () => { off = true }
-  }, [view, order, closed])
+    // Re-query only when the committee or the set of closed rounds changes (each query costs budget).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.circleId, closed.size, order.length])
   if (!res) return null
   return (
     <Card className="flex flex-col gap-2">
