@@ -44,17 +44,9 @@
   display: flex; justify-content: space-between;
   font-weight: 800; font-size: clamp(1.1rem, 2.4vw, 2rem); letter-spacing: -0.02em; margin-bottom: 0.5rem;
 }
-.mega {
-  font-family: var(--font-bebas), "Arial Narrow", sans-serif;
-  font-weight: 400; letter-spacing: 0; line-height: 0.82;
-  font-size: clamp(5rem, 19.6vw, 21rem);
-  text-align: center; white-space: nowrap;
-  background: linear-gradient(100deg, var(--ember) 0%, #c43d17 14%, #f4a340 30%, #ff7a1a 44%, var(--ember) 52%, #f06a1f 62%, #f4a340 76%, #c43d17 88%, var(--ember) 100%);
-  background-size: 220% 100%;
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  animation: sheen 14s ease-in-out infinite alternate;
-}
-@keyframes sheen { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+.megaWrap { margin: 0; }
+.mega { display: block; width: 100%; height: auto; overflow: visible; }
+.megaText { font-family: var(--font-bebas), "Arial Narrow", sans-serif; font-size: 358px; }@keyframes sheen { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
 
 /* ── Colour band ─────────────────────────────────── */
 .band {
@@ -225,6 +217,6 @@
 .footNote { text-align: center; color: #6f6962; font-size: 0.85rem; margin-top: 1rem; }
 
 @media (prefers-reduced-motion: reduce) {
-  .mega, .track, .bandSeal { animation: none; }
+  .track, .bandSeal { animation: none; }
   .marquee { overflow-x: auto; }
 }

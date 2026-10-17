@@ -63,7 +63,25 @@ export default function Landing() {
       {/* Hero: giant word */}
       <section className={s.hero}>
         <div className={s.corners}><span>©2026</span><span>ON ARKIV</span></div>
-        <h1 className={s.mega} aria-label="Committee">COMMITTEE</h1>
+        <h1 className={s.megaWrap}>
+          <span className="sr-only">Committee</span>
+          {/* SVG text stretched to exactly the content width at every screen size. */}
+          <svg viewBox="0 0 1000 286" className={s.mega} aria-hidden preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <linearGradient id="megaFill" x1="0" x2="1" y1="0" y2="0.35">
+                <stop offset="0" stopColor="#6b1d0c" />
+                <stop offset="0.18" stopColor="#e8562a" />
+                <stop offset="0.36" stopColor="#f4a340" />
+                <stop offset="0.5" stopColor="#7a210d" />
+                <stop offset="0.66" stopColor="#f06a1f" />
+                <stop offset="0.84" stopColor="#f4a340" />
+                <stop offset="1" stopColor="#8f220b" />
+                <animateTransform attributeName="gradientTransform" type="translate" values="-0.25 0; 0.25 0; -0.25 0" dur="16s" repeatCount="indefinite" />
+              </linearGradient>
+            </defs>
+            <text x="0" y="276" textLength="1000" lengthAdjust="spacingAndGlyphs" fill="url(#megaFill)" className={s.megaText}>COMMITTEE</text>
+          </svg>
+        </h1>
       </section>
 
       {/* Colour band */}
