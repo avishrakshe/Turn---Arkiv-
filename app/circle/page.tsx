@@ -273,14 +273,7 @@ function RoundCard({ r, view, me, isOrganiser, busy, onPay, onAck, onClose, onDi
         {r.payments.map((p) => (
           <PaymentRow key={p.payer} p={p} r={r} view={view} me={me} busy={busy} onAck={onAck} onDispute={onDispute} />
         ))}
-      </ul>      {isOrganiser && (
-        <div className="flex flex-col gap-1">
-          <Button tone={allConfirmed ? "primary" : "quiet"} busy={busy === "close"} onClick={onClose}>
-            {t("closeRound", { n: r.round, name: collectorName, amount: inr(fixedPayout(view.rules, view.members.length)) })}
-          </Button>
-          <p className="text-xs text-ink-muted">{t("closeHint")}</p>
-        </div>
-      )}
+      </ul>      {isOrganiser && <CloseRound r={r} view={view} busy={busy === "close"} allConfirmed={allConfirmed} onClose={onClose} />}
     </Card>
   )
 }
@@ -365,7 +358,7 @@ function PaymentRow({ p, r, view, me, busy, onAck, onDispute }: {
         </div>
       </div>
       {(p.claim || p.ack) && (
-        <details className="ps-12 text-xs text-ink-muted">
+        <details className="-mt-1 ps-12 text-xs text-ink-muted">
           <summary className="cursor-pointer select-none">{t("signatures")}</summary>
           <div className="mt-1 flex flex-col gap-0.5">
             {p.claim && <Stamp name={payer} address={p.claim.creator} entityKey={p.claim.key} />}
@@ -375,7 +368,7 @@ function PaymentRow({ p, r, view, me, busy, onAck, onDispute }: {
       )}
       {p.disputes.length > 0 && <div className="flex flex-col gap-1 ps-12">{p.disputes.map((d) => <DisputeLine key={d.key} d={d} view={view} />)}</div>}
       {(canAck || canDispute) && (
-        <div className="flex flex-wrap items-center gap-2 ps-12">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 ps-12">
           {canAck && !armed && (
             <Button tone="teal" className="min-h-10 px-4" onClick={() => setArmed(true)}>{t("markReceived")}</Button>
           )}
@@ -396,5 +389,28 @@ function PaymentRow({ p, r, view, me, busy, onAck, onDispute }: {
         </div>
       )}
     </li>
+  )
+}
+/** Closing a round is final. If not every seal is locked, ask first and say how many are open. */
+function CloseRound({ r, view, busy, allConfirmed, onClose }: { r: RoundView; view: CircleView; busy: boolean; allConfirmed: boolean; onClose: () => void }) {
+  const { t } = useT()
+  const [armed, setArmed] = useState(false)
+  useEffect(() => { setArmed(false) }, [r.progress.confirmed, r.round])
+  const label = t("closeRound", { n: r.round, name: nameOf(view, r.collector), amount: inr(fixedPayout(view.rules, view.members.length)) })
+  return (
+    <div className="flex flex-col gap-2 border-t border-line pt-3">
+      {!armed ? (
+        <Button tone={allConfirmed ? "primary" : "quiet"} busy={busy} onClick={() => (allConfirmed ? onClose() : setArmed(true))}>{label}</Button>
+      ) : (
+        <div className="flex flex-col gap-2 rounded-xl border border-warning/40 bg-warning-soft p-3" role="group">
+          <p className="text-sm">{t("closeEarly", { done: r.progress.confirmed, total: r.progress.total })}</p>
+          <div className="flex gap-2">
+            <Button tone="primary" className="min-h-10 flex-1" busy={busy} onClick={() => { setArmed(false); onClose() }}>{t("closeAnyway")}</Button>
+            <Button tone="quiet" className="min-h-10" onClick={() => setArmed(false)}>{t("ackNo")}</Button>
+          </div>
+        </div>
+      )}
+      <p className="text-xs text-ink-muted">{t("closeHint")}</p>
+    </div>
   )
 }

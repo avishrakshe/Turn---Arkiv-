@@ -39,7 +39,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <I18nProvider>
       <App.Provider value={{ account, ready, start, toast }}>
         {children}
-        <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex flex-col items-center gap-2 px-4">
+        <div aria-live="polite" className="pointer-events-none fixed inset-x-0 top-16 z-50 flex flex-col items-center gap-2 px-4">
           {toasts.map((t) => (
             <div key={t.id} className={`toast pointer-events-auto max-w-sm rounded-2xl px-4 py-3 text-sm font-medium shadow-[var(--shadow-soft)] ${
               t.tone === "ok" ? "bg-teal text-on-teal" : t.tone === "warn" ? "bg-warning-soft text-ink" : "bg-paper-raised text-ink border border-line"}`}>

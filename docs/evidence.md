@@ -67,3 +67,35 @@ second drip to same address → { status: 'refused', reason: 'already_funded' }
 ```
 
 A native GLM transfer works on Tiramisu: [0x15d4…778c](https://tiramisu.explorer.arkiv.network/tx/0x15d496fd9ba713cd5639e7b46ea9dd50dfbb9627343379b5cd2966e42dcd778c).
+
+## 3. End-to-end on production (https://turn-arkiv.vercel.app), 2026-10-17 16:00–17:36 IST
+
+Committee "Prod Check BC", `circle_id = 31aa1255453d747719101afa4e4b6194`, demo cadence (10-minute
+rounds), 3 members. Meera (organiser, `0x8a85e27d…8344`) used the real app in Chrome; Ravi
+(`0x942f9623…6743`) and Priya (`0xd49ac195…70c4`) acted from their own keys via a script calling the
+same library code, so their records reach the chain exactly as from another phone.
+
+| Step | Who | Result in Meera's UI |
+|---|---|---|
+| Create committee (drip + circle + member + invite) | Meera, UI | invite link in ~50 s |
+| Join ×2 | Ravi, Priya | both listed, "Signed by …" each |
+| Lock member list | Meera, UI | round 1 opens; "Who hasn't paid" lists both |
+| "I've paid" r1 | Ravi | **appears live** (WebSocket), no refresh |
+| "Received" r1 | Meera, UI | "Paid ✓ confirmed by Meera S." |
+| Forged receipt from a non-member wallet `0x178295f0…` | outsider | ignored; "1 unverified record ignored" |
+| Close round 1 (round_result + lease renewal, one batch) | Meera, UI | exactly one `round_result` on chain (block 694399) |
+| "I've paid" r2 | Meera, UI | her half of the seal lights |
+| "Received" r2 | Ravi | **seal locks live** on Meera's screen |
+| "I've paid" r2 | Priya | toast "Priya N. just paid ✓" |
+| Dispute on Priya's claim | Meera, UI | seal cracks; "Reported by Meera S." |
+| Keep our record alive | Meera, UI | "Record kept until" 16 Nov 2026 → **14 Feb 2027** |
+
+Every UI write was logged once in the console (`[turn] write close / pay-UPI / dispute / keep`).
+
+**Open finding (first run, before the fix):** at block 691877, Meera's browser created a `pay_ack`
+for Priya's round-1 claim (`0x88c6a549…`, two blocks after the outsider's forged ack) although no
+click was made in that window. The cause was not reproduced. In response, "Received" is now a
+two-step confirmation ("Did ₹5,000 from Priya reach you? → Yes, received") that disarms after 8 s or
+on any data change and ignores untrusted events, and every write is logged with its trigger. No
+unexpected write occurred in the second run above. Because records are immutable, that ack remains
+on chain; it is a test artefact on a test committee.
